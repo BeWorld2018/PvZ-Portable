@@ -1,7 +1,7 @@
-# Makefile for PvZ-Portable on MorphOS
+# Makefile for PvZ-Portable - PlantsVsZombies on MorphOS
 #
 
-PROGRAM ?= pvz-portable
+PROGRAM ?= PlantsVsZombies
 BUILD ?= release
 
 CROSS_COMPILE = ppc-morphos-
@@ -10,6 +10,8 @@ CXX = $(CROSS_COMPILE)g++-15
 AR = $(CROSS_COMPILE)ar
 STRIP = $(CROSS_COMPILE)strip
 
+AMIGADATE := $(shell date +"%-d.%-m.%Y")
+
 MKDIR_P ?= mkdir -p
 RM_F ?= rm -f
 RM_RF ?= rm -rf
@@ -17,13 +19,12 @@ RM_RF ?= rm -rf
 SYS_INCLUDE_DIRS ?=
 SYS_LIBRARY_DIRS ?=
 SYSROOT_FLAGS ?=
-MORPHOS_FLAGS ?=
+MORPHOS_FLAGS = -D__AMIGADATE__=\"$(AMIGADATE)\"
 CPU_FLAGS ?=
 
 PVZ_DEBUG = 0
 DO_FIX_BUGS = 0
 LOW_MEMORY = 0
-DOWNSCALE_COUNT = 1
 
 # Build the vendored SDL-Mixer-X subset by default.
 BUILD_MIXERX = 0
@@ -65,16 +66,11 @@ APP_CPP_SOURCES := $(sort \
 	$(wildcard src/SexyAppFramework/paklib/*.cpp) \
 	$(wildcard src/SexyAppFramework/sound/*.cpp) \
 	$(wildcard src/SexyAppFramework/widget/*.cpp) \
-	$(wildcard src/Sexy.TodLib/*.cpp) \
+	$(wildcard src/PvzpLib/*.cpp) \
 	$(wildcard src/Lawn/*.cpp) \
 	$(wildcard src/Lawn/Widget/*.cpp) \
 	$(wildcard src/Lawn/System/*.cpp) \
 	$(wildcard src/SexyAppFramework/platform/default/*.cpp))
-
-APP_CPP_SOURCES := $(filter-out \
-	src/Sexy.TodLib/TodDrawTriangle.cpp \
-	src/Sexy.TodLib/TodDrawTriangleInc.cpp, \
-	$(APP_CPP_SOURCES))
 
 APP_C_SOURCES := $(sort $(wildcard src/SexyAppFramework/fcaseopen/*.c))
 
@@ -105,7 +101,7 @@ DEPS := $(APP_OBJECTS:.o=.d) $(MIXERX_OBJECTS:.o=.d)
 
 CPPFLAGS += $(SYSROOT_FLAGS) $(MORPHOS_FLAGS)
 CPPFLAGS += $(addprefix -I,$(PROJECT_INCLUDE_DIRS) $(SYS_INCLUDE_DIRS))
-CPPFLAGS += -DIMG_DOWNSCALE=$(DOWNSCALE_COUNT)
+
 
 COMMON_WARNINGS ?= -Wall -Wextra -Wno-unused-parameter -I/gg/usr/local/include/SDL2 -I/gg/usr/local/include
 COMMON_FLAGS := $(CPU_FLAGS) -MMD -MP

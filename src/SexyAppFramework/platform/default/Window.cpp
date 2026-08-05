@@ -117,6 +117,12 @@ void SexyAppBase::MakeWindow()
 		}
 #endif
 
+#ifdef __MORPHOS__
+		// clean window background
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		SDL_GL_SwapWindow((SDL_Window*)mWindow);
+#endif
 		SDL_GL_SetSwapInterval(1);
 	}
 

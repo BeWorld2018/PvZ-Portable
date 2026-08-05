@@ -40,8 +40,9 @@ using namespace Sexy;
 #endif
 
 #ifdef __MORPHOS__
+#include "ProjectVersion.h"
 unsigned long __stack = 1024 * 1024 *2;
-static const char *version __attribute__((used)) = "$VER: PlantsVsZombies 0.2.0 (05.08.2026)";
+static const char *version __attribute__((used)) = "$VER: PlantsVsZombies " PVZP_VERSION " (" __AMIGADATE__ ")";
 #endif
 #ifdef _WIN32
 static std::vector<std::string> gUtf8ArgsStorage;

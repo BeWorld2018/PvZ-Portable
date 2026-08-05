@@ -26,7 +26,11 @@
 
 #include "Common.h"
 #include "ImageLib.h"
+#ifdef __MORPHOS__
+#include "png16.h"
+#else
 #include "png.h"
+#endif
 #include <math.h>
 #include <algorithm>
 #include <array>
@@ -140,30 +144,42 @@ Image* GetPNGImage(const std::string& theFileName)
 	//png_ptr->io_ptr = (png_voidp)fp;
 
 	png_read_info(png_ptr, info_ptr);
-	png_get_IHDR(png_ptr, info_ptr, &width, &height, nullptr, nullptr,
+
+	int bit_depth = 0;
+	png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, nullptr,
        nullptr, nullptr, nullptr);
 
 	png_set_expand(png_ptr);
-	if constexpr (std::endian::native == std::endian::big)
-	{
-		png_set_filler(png_ptr, 0xff, PNG_FILLER_BEFORE);
-	}
-	else
-	{
-		png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
-		png_set_bgr(png_ptr);
-	}
+	if (bit_depth == 16)
+		png_set_strip_16(png_ptr);
 	png_set_palette_to_rgb(png_ptr);
 	png_set_gray_to_rgb(png_ptr);
+	png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
+	png_read_update_info(png_ptr, info_ptr);
 
-//	int aNumBytes = png_get_rowbytes(png_ptr, info_ptr) * height / 4;
+	const png_size_t rowBytes = png_get_rowbytes(png_ptr, info_ptr);
+	png_bytep rawPixels = new png_byte[rowBytes * height];
 	png_bytep* row_pointers = new png_bytep[height];
-	uint32_t* aBits = new uint32_t[width*height];
-	for (uint i = 0; i < height; i++)
-	{
-		row_pointers[i] = (png_bytep)(aBits + i*width);
-	}
+	for (png_uint_32 y = 0; y < height; y++)
+		row_pointers[y] = rawPixels + y * rowBytes;
+
 	png_read_image(png_ptr, row_pointers);
+
+	uint32_t* aBits = new uint32_t[width * height];
+	for (png_uint_32 y = 0; y < height; y++)
+	{
+		const png_bytep src = rawPixels + y * rowBytes;
+		uint32_t* dst = aBits + y * width;
+		for (png_uint_32 x = 0; x < width; x++)
+		{
+			const png_bytep pixel = src + x * 4;
+			const uint32_t r = pixel[0];
+			const uint32_t g = pixel[1];
+			const uint32_t b = pixel[2];
+			const uint32_t a = pixel[3];
+			dst[x] = (a << 24) | (r << 16) | (g << 8) | b;
+		}
+	}
 
 	/* read rest of file, and get additional chunks in info_ptr - REQUIRED */
 	png_read_end(png_ptr, info_ptr);
@@ -174,6 +190,7 @@ Image* GetPNGImage(const std::string& theFileName)
 	/* close the file */
 	p_fclose(fp);
 	delete[] row_pointers;
+	delete[] rawPixels;
 
 	Image* anImage = new Image();
 	anImage->mWidth = width;

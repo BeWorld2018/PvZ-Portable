@@ -32,6 +32,9 @@
 #include "PvzpDebug.h"
 #include "Definition.h"
 #include "zlib.h"
+#ifdef __MORPHOS__
+#undef AddTail
+#endif
 #include "paklib/PakInterface.h"
 #include "misc/PerfTimer.h"
 #include "misc/XMLParser.h"
