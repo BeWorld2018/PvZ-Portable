@@ -31,6 +31,9 @@
 #include "../MessageWidget.h"
 #include "../../PvzpLib/Trail.h"
 #include "zlib.h"
+#ifdef __MORPHOS__
+#undef AddTail
+#endif
 #include "../../PvzpLib/Attachment.h"
 #include "../../PvzpLib/Reanimator.h"
 #include "../../PvzpLib/PvzpParticle.h"

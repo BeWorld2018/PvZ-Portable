@@ -199,6 +199,21 @@ SexyAppBase::SexyAppBase()
 	}
 #elif defined(__EMSCRIPTEN__)
 	mResourceDir = "/";
+#elif defined(__MORPHOS__)
+	char* aBasePath = SDL_GetBasePath();
+	if (aBasePath)
+	{
+		mResourceDir = aBasePath;
+
+		if (mResourceDir.empty() || mResourceDir.back() != '/')
+			mResourceDir += '/';
+
+		SDL_free(aBasePath);
+	}
+	else
+	{
+		mResourceDir = "";
+	}
 #else
 	char* aBasePath = SDL_GetBasePath();
 	if (aBasePath)
@@ -3502,6 +3517,14 @@ void SexyAppBase::Init()
 #elif defined(__EMSCRIPTEN__)
 	{
 		SetAppDataFolder("/saves/");
+	}
+#elif defined(__MORPHOS__)
+	char* aPrefPath = SDL_GetBasePath();
+	if (aPrefPath)
+	{
+
+		SetAppDataFolder(aPrefPath);
+		SDL_free(aPrefPath);
 	}
 #elif !defined(__SWITCH__)
 	{

@@ -32,6 +32,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __MORPHOS__
+#include <strings.h>
+#include <alloca.h>
+#endif 
+
 #include <dirent.h>
 #include <errno.h>
 #endif

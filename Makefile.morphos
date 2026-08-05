@@ -1,0 +1,249 @@
+# Makefile for PvZ-Portable on MorphOS
+#
+
+PROGRAM ?= pvz-portable
+BUILD ?= release
+
+CROSS_COMPILE = ppc-morphos-
+CC = $(CROSS_COMPILE)gcc-15
+CXX = $(CROSS_COMPILE)g++-15
+AR = $(CROSS_COMPILE)ar
+STRIP = $(CROSS_COMPILE)strip
+
+MKDIR_P ?= mkdir -p
+RM_F ?= rm -f
+RM_RF ?= rm -rf
+
+SYS_INCLUDE_DIRS ?=
+SYS_LIBRARY_DIRS ?=
+SYSROOT_FLAGS ?=
+MORPHOS_FLAGS ?=
+CPU_FLAGS ?=
+
+PVZ_DEBUG = 0
+DO_FIX_BUGS = 0
+LOW_MEMORY = 0
+DOWNSCALE_COUNT = 1
+
+# Build the vendored SDL-Mixer-X subset by default.
+BUILD_MIXERX = 0
+MIXERX_EXTERNAL_LIB ?= -noixemul -L/gg/usr/local/lib -lSDL2_mixerX -lopenmpt 
+
+# Libraries. Override any group if your MorphOS SDK uses other names.
+SDL_MAIN_LIB ?=
+SDL_LIBS ?= -noixemul -L/gg/usr/local/lib -lSDL2 -lGL -lpng16 -ljpeg -lm
+AUDIO_LIBS ?= 
+IMAGE_LIBS ?= 
+THREAD_LIBS ?= 
+STDCXXFS_LIB ?=
+SYSTEM_LIBS ?= 
+EXTRA_LIBS ?=
+
+BUILD_DIR ?= build/morphos/$(BUILD)
+APP_OBJ_DIR := $(BUILD_DIR)/obj/app
+MIXER_OBJ_DIR := $(BUILD_DIR)/obj/mixerx
+MIXERX_ARCHIVE := $(BUILD_DIR)/libSDL2_mixer_ext.a
+
+PROJECT_INCLUDE_DIRS := \
+	src \
+	src/SexyAppFramework \
+	src/SexyAppFramework/platform/default \
+	src/SexyAppFramework/sound/SDL-Mixer-X/include
+
+MIXERX_DIR := src/SexyAppFramework/sound/SDL-Mixer-X
+MIXERX_INCLUDE_DIRS := \
+	$(MIXERX_DIR)/include \
+	$(MIXERX_DIR)/src \
+	$(MIXERX_DIR)/src/codecs
+
+APP_CPP_SOURCES := $(sort \
+	$(wildcard src/*.cpp) \
+	$(wildcard src/SexyAppFramework/*.cpp) \
+	$(wildcard src/SexyAppFramework/graphics/*.cpp) \
+	$(wildcard src/SexyAppFramework/imagelib/*.cpp) \
+	$(wildcard src/SexyAppFramework/misc/*.cpp) \
+	$(wildcard src/SexyAppFramework/paklib/*.cpp) \
+	$(wildcard src/SexyAppFramework/sound/*.cpp) \
+	$(wildcard src/SexyAppFramework/widget/*.cpp) \
+	$(wildcard src/Sexy.TodLib/*.cpp) \
+	$(wildcard src/Lawn/*.cpp) \
+	$(wildcard src/Lawn/Widget/*.cpp) \
+	$(wildcard src/Lawn/System/*.cpp) \
+	$(wildcard src/SexyAppFramework/platform/default/*.cpp))
+
+APP_CPP_SOURCES := $(filter-out \
+	src/Sexy.TodLib/TodDrawTriangle.cpp \
+	src/Sexy.TodLib/TodDrawTriangleInc.cpp, \
+	$(APP_CPP_SOURCES))
+
+APP_C_SOURCES := $(sort $(wildcard src/SexyAppFramework/fcaseopen/*.c))
+
+# SDL-Mixer-X configuration corresponding to the options used by the project:
+# MIDI, ModPlug, XMP, Opus, dr_flac and PXTone are disabled; WAV, stb-vorbis,
+# dr_mp3 and libopenmpt are enabled.
+MIXERX_C_SOURCES := \
+	$(MIXERX_DIR)/src/effect_position.c \
+	$(MIXERX_DIR)/src/effect_stereoreverse.c \
+	$(MIXERX_DIR)/src/effects_internal.c \
+	$(MIXERX_DIR)/src/mixer.c \
+	$(MIXERX_DIR)/src/mixer_x_deprecated.c \
+	$(MIXERX_DIR)/src/music.c \
+	$(MIXERX_DIR)/src/utils.c \
+	$(MIXERX_DIR)/src/codecs/load_aiff.c \
+	$(MIXERX_DIR)/src/codecs/load_voc.c \
+	$(MIXERX_DIR)/src/codecs/mp3utils.c \
+	$(MIXERX_DIR)/src/codecs/music_drmp3.c \
+	$(MIXERX_DIR)/src/codecs/music_ogg_stb.c \
+	$(MIXERX_DIR)/src/codecs/music_openmpt.c \
+	$(MIXERX_DIR)/src/codecs/music_wav.c
+
+APP_CPP_OBJECTS := $(addprefix $(APP_OBJ_DIR)/,$(APP_CPP_SOURCES:.cpp=.o))
+APP_C_OBJECTS := $(addprefix $(APP_OBJ_DIR)/,$(APP_C_SOURCES:.c=.o))
+APP_OBJECTS := $(APP_CPP_OBJECTS) $(APP_C_OBJECTS)
+MIXERX_OBJECTS := $(addprefix $(MIXER_OBJ_DIR)/,$(MIXERX_C_SOURCES:.c=.o))
+DEPS := $(APP_OBJECTS:.o=.d) $(MIXERX_OBJECTS:.o=.d)
+
+CPPFLAGS += $(SYSROOT_FLAGS) $(MORPHOS_FLAGS)
+CPPFLAGS += $(addprefix -I,$(PROJECT_INCLUDE_DIRS) $(SYS_INCLUDE_DIRS))
+CPPFLAGS += -DIMG_DOWNSCALE=$(DOWNSCALE_COUNT)
+
+COMMON_WARNINGS ?= -Wall -Wextra -Wno-unused-parameter -I/gg/usr/local/include/SDL2 -I/gg/usr/local/include
+COMMON_FLAGS := $(CPU_FLAGS) -MMD -MP
+CFLAGS += $(COMMON_FLAGS) $(COMMON_WARNINGS) -std=gnu11
+CXXFLAGS += $(COMMON_FLAGS) $(COMMON_WARNINGS) -std=c++20
+LDFLAGS += $(SYSROOT_FLAGS) $(MORPHOS_FLAGS) $(CPU_FLAGS)
+LDFLAGS += $(addprefix -L,$(SYS_LIBRARY_DIRS))
+
+ifeq ($(BUILD),debug)
+PVZ_DEBUG := 1
+CFLAGS += -O0 -g
+CXXFLAGS += -O0 -g
+else ifeq ($(BUILD),release)
+CPPFLAGS += -DNDEBUG -noixemul
+CFLAGS += -O2 -noixemul
+CXXFLAGS += -O2 -noixemul
+else
+$(error BUILD must be either debug or release)
+endif
+
+ifeq ($(PVZ_DEBUG),1)
+CPPFLAGS += -DPVZ_DEBUG
+endif
+ifeq ($(DO_FIX_BUGS),1)
+CPPFLAGS += -DDO_FIX_BUGS
+endif
+ifeq ($(LOW_MEMORY),1)
+CPPFLAGS += -DLOW_MEMORY
+endif
+
+MIXERX_CPPFLAGS := $(SYSROOT_FLAGS) $(MORPHOS_FLAGS)
+MIXERX_CPPFLAGS += $(addprefix -I,$(MIXERX_INCLUDE_DIRS) $(SYS_INCLUDE_DIRS))
+MIXERX_CPPFLAGS += \
+	-DHAVE_INTTYPES_H \
+	-DHAVE_SETENV \
+	-DHAVE_SINF \
+	-DPIC \
+	-D_REENTRANT \
+	-D_USE_MATH_DEFINES \
+	-DMUSIC_WAV \
+	-DMUSIC_OGG \
+	-DOGG_USE_STB \
+	-DMUSIC_MP3_DRMP3 \
+	-DMUSIC_MOD_OPENMPT \
+	-DOPENMPT_STATIC
+MIXERX_CFLAGS := $(COMMON_FLAGS) $(CPU_FLAGS) -std=c99 -Wall -Wextra \
+	-Wno-long-long -Wno-missing-field-initializers -Wno-unused-parameter
+
+ifeq ($(BUILD_MIXERX),1)
+MIXERX_LINK_INPUT := $(MIXERX_ARCHIVE)
+MIXERX_PREREQUISITE := $(MIXERX_ARCHIVE)
+else
+MIXERX_LINK_INPUT := $(MIXERX_EXTERNAL_LIB)
+MIXERX_PREREQUISITE :=
+endif
+
+LDLIBS := $(MIXERX_LINK_INPUT) $(AUDIO_LIBS) $(IMAGE_LIBS) \
+	$(SDL_LIBS) $(THREAD_LIBS) $(STDCXXFS_LIB) $(SYSTEM_LIBS) $(EXTRA_LIBS)
+
+.PHONY: all release debug clean distclean strip info sources help
+
+all: $(PROGRAM)
+
+release:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) BUILD=release all
+
+debug:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) BUILD=debug all
+
+$(PROGRAM): $(APP_OBJECTS) $(MIXERX_PREREQUISITE)
+	@echo "Linking $@"
+	$(CXX) $(LDFLAGS) -o $@ $(APP_OBJECTS) $(LDLIBS)
+
+$(MIXERX_ARCHIVE): $(MIXERX_OBJECTS)
+	@$(MKDIR_P) $(dir $@)
+	@echo "Archiving $@"
+	$(AR) rcs $@ $^
+
+$(APP_OBJ_DIR)/%.o: %.cpp
+	@$(MKDIR_P) $(dir $@)
+	@echo "CXX $<"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(APP_OBJ_DIR)/%.o: %.c
+	@$(MKDIR_P) $(dir $@)
+	@echo "CC  $<"
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(MIXER_OBJ_DIR)/%.o: %.c
+	@$(MKDIR_P) $(dir $@)
+	@echo "CC  $<"
+	$(CC) $(MIXERX_CPPFLAGS) $(MIXERX_CFLAGS) -c $< -o $@
+
+strip: $(PROGRAM)
+	$(STRIP) $(PROGRAM)
+
+clean:
+	$(RM_RF) $(BUILD_DIR)
+
+distclean:
+	$(RM_RF) build
+	$(RM_F) $(PROGRAM)
+
+info:
+	@echo "Program:             $(PROGRAM)"
+	@echo "Build:               $(BUILD)"
+	@echo "CC:                  $(CC)"
+	@echo "CXX:                 $(CXX)"
+	@echo "C++ standard:        C++20"
+	@echo "Build SDL-Mixer-X:   $(BUILD_MIXERX)"
+	@echo "Application sources: $(words $(APP_CPP_SOURCES) $(APP_C_SOURCES))"
+	@echo "Mixer-X sources:     $(words $(MIXERX_C_SOURCES))"
+	@echo "Include dirs:        $(SYS_INCLUDE_DIRS)"
+	@echo "Library dirs:        $(SYS_LIBRARY_DIRS)"
+	@echo "Libraries:           $(LDLIBS)"
+
+sources:
+	@echo "Application C++ sources:"
+	@echo "$(APP_CPP_SOURCES)"
+	@echo "Application C sources:"
+	@echo "$(APP_C_SOURCES)"
+	@echo "SDL-Mixer-X C sources:"
+	@echo "$(MIXERX_C_SOURCES)"
+
+help:
+	@echo "PvZ-Portable MorphOS Makefile"
+	@echo ""
+	@echo "  make -f Makefile.morphos [all]       Build a release binary"
+	@echo "  make -f Makefile.morphos debug       Build with symbols and PVZ_DEBUG"
+	@echo "  make -f Makefile.morphos strip       Strip the executable"
+	@echo "  make -f Makefile.morphos clean       Remove the active build directory"
+	@echo "  make -f Makefile.morphos distclean   Remove all builds and the executable"
+	@echo "  make -f Makefile.morphos info        Show the resolved configuration"
+	@echo ""
+	@echo "Typical SDK overrides:"
+	@echo "  SYS_INCLUDE_DIRS=\".../include .../include/SDL2\""
+	@echo "  SYS_LIBRARY_DIRS=\".../lib\""
+	@echo "  MORPHOS_FLAGS=\"<runtime/toolchain flags>\""
+	@echo "  THREAD_LIBS=\"-lpthread\" or THREAD_LIBS=\"\""
+
+-include $(DEPS)

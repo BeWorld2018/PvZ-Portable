@@ -40,7 +40,7 @@ void SexyAppBase::MakeWindow()
 {
 	if (mWindow)
 	{
-		SDL_SetWindowFullscreen((SDL_Window*)mWindow, (!mIsWindowed ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+		SDL_SetWindowFullscreen((SDL_Window*)mWindow, (!mIsWindowed ? SDL_WINDOW_FULLSCREEN : 0));
 	}
 	else
 	{
@@ -54,12 +54,14 @@ void SexyAppBase::MakeWindow()
 		SDL_Init(SDL_INIT_VIDEO);
 
 		Uint32 winFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
-			| (!mIsWindowed ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+			| (!mIsWindowed ? SDL_WINDOW_FULLSCREEN : 0);
 
+#ifndef __MORPHOS__
 		// Try OpenGL ES 2.0 first (Linux, most Windows drivers, ANGLE, etc.)
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
 
 		mWindow = (void*)SDL_CreateWindow(
 			mTitle.c_str(),
@@ -109,7 +111,9 @@ void SexyAppBase::MakeWindow()
 				return;
 			}
 
+#ifndef __MORPHOS__
 			gDesktopGLFallback = true;
+#endif
 		}
 #endif
 

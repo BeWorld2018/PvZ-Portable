@@ -51,11 +51,17 @@ static inline char ToLowerAscii(char c)
 
 static inline void SexyLogV(SDL_LogPriority thePriority, const char* theFormat, va_list theArgs)
 {
+#if defined(__MORPHOS__)
+	(void)thePriority;
+	(void)theFormat;
+	(void)theArgs;
+#else
 	std::string aBuffer = Sexy::VFormat(theFormat, theArgs);
 	if (aBuffer.empty())
 		return;
 
 	SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, thePriority, "%s", aBuffer.c_str());
+#endif
 }
 
 static inline bool IsUnicodeSpace(char32_t theChar)
@@ -117,7 +123,22 @@ std::string Sexy::GetAppDataFolder()
 
 void Sexy::SetAppDataFolder(std::string_view thePath)
 {
+#ifdef __MORPHOS__
+	std::string aPath(thePath);
+
+	if (aPath.empty())
+	{
+		aPath = "";
+	}
+	else if (aPath.back() != '/' && aPath.back() != ':')
+	{
+		aPath += '/';
+	}
+
+	Sexy::gAppDataFolder = PathFromU8(aPath);
+#else
 	Sexy::gAppDataFolder = PathFromU8(thePath);
+#endif
 }
 
 std::string Sexy::GetAppDataPath(std::string_view theRelativePath)

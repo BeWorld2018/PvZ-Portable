@@ -22,7 +22,9 @@
  * along with PvZ-Portable. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#ifndef __MORPHOS__
 #define GLAD_GLES2_IMPLEMENTATION
+#endif
 #include "graphics/GLPlatform.h"
 
 #include <SDL.h>
@@ -45,7 +47,9 @@
 
 using namespace Sexy;
 
+#ifndef __MORPHOS__
 bool gDesktopGLFallback = false;
+#endif
 
 static inline uint32_t ArgbToRgba(uint32_t argb) noexcept
 {
@@ -82,9 +86,11 @@ static bool gLinearFilter = false;
 static std::vector<GLVertex> gVertices;
 static int gNumVertices;
 static GLenum gVertexMode;
+#ifndef __MORPHOS__
 static GLuint gProgram;
 static GLuint gVbo;
 static GLint gUfViewProjMtx, gUfTexture, gUfUseTexture, gUfUvBounds, gUfClampUvEnabled;
+#endif
 
 static void GfxBegin(GLenum vertexMode)
 {
@@ -98,6 +104,20 @@ static void GfxEnd()
 
 	if (gNumVertices > 0)
 	{
+#ifdef __MORPHOS__
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_COLOR_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+		glVertexPointer(3, GL_FLOAT, sizeof(GLVertex), &gVertices[0].sx);
+		glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(GLVertex), &gVertices[0].color);
+		glTexCoordPointer(2, GL_FLOAT, sizeof(GLVertex), &gVertices[0].tu);
+		glDrawArrays(gVertexMode, 0, gNumVertices);
+
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		glDisableClientState(GL_COLOR_ARRAY);
+		glDisableClientState(GL_VERTEX_ARRAY);
+#else
 		glBindBuffer(GL_ARRAY_BUFFER, gVbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(GLVertex) * gNumVertices, gVertices.data(), GL_DYNAMIC_DRAW);
 
@@ -109,6 +129,7 @@ static void GfxEnd()
 		glEnableVertexAttribArray(2);
 
 		glDrawArrays(gVertexMode, 0, gNumVertices);
+#endif
 	}
 
 	gVertexMode = (GLenum)-1;
@@ -170,6 +191,7 @@ static void GfxAddVertices(const TriVertex arr[][3], int arrCount, unsigned int 
 	GfxFlushIfOverBudget();
 }
 
+#ifndef __MORPHOS__
 // Unified GLSL body; VERT_IN / V2F / FRAG_OUT / TEX2D macros from GLPlatform.h.
 static constexpr const char *SHADER_CODE = R"DELIMITER(
 V2F vec4 v_color;
@@ -274,6 +296,8 @@ static void MakeOrthoMatrix(float l, float r, float b, float t, float n, float f
 	m[8]  = 0;                m[9]  = 0;                 m[10] = -2.0f / (f - n);   m[11] = 0;
 	m[12] = -(r+l)/(r-l);    m[13] = -(t+b)/(t-b);     m[14] = -(f+n)/(f-n);      m[15] = 1;
 }
+
+#endif // __MORPHOS__
 
 static void CopyImageToTexture8888(MemoryImage *img, int offx, int offy,
 	int w, int h, int pitch, int dstH, bool padR, bool padB, bool create)
@@ -730,16 +754,42 @@ static void SetLinearFilter(bool linear)
 	gLinearFilter = linear;
 }
 
+static void GfxSelectTexture0()
+{
+#ifndef __MORPHOS__
+	glActiveTexture(GL_TEXTURE0);
+#endif
+}
+
+static void GfxUseTexture(bool enabled)
+{
+#ifdef __MORPHOS__
+	if (enabled)
+		glEnable(GL_TEXTURE_2D);
+	else
+		glDisable(GL_TEXTURE_2D);
+#else
+	glUniform1i(gUfUseTexture, enabled ? 1 : 0);
+#endif
+}
+
 static constexpr float kDefaultUvBounds[4] = { 0.f, 0.f, 1.f, 1.f };
 
 static void GfxBindTexture(GLuint tex, const float *uvBounds = kDefaultUvBounds, bool clampUv = true)
 {
+	GfxSelectTexture0();
+	GfxUseTexture(true);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	int f = gLinearFilter ? GL_LINEAR : GL_NEAREST;
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, f);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, f);
+#ifndef __MORPHOS__
 	glUniform1i(gUfClampUvEnabled, clampUv ? 1 : 0);
 	glUniform4fv(gUfUvBounds, 1, uvBounds);
+#else
+	(void)uvBounds;
+	(void)clampUv;
+#endif
 }
 
 void TextureData::Blt(float theX, float theY, const Rect& theSrcRect, const Color& theColor)
@@ -751,8 +801,13 @@ void TextureData::Blt(float theX, float theY, const Rect& theSrcRect, const Colo
 	if (srcLeft >= srcRight || srcTop >= srcBottom) return;
 
 	uint32_t aColor = theColor.ToGLColor();
+#ifdef __MORPHOS__
+	GfxSelectTexture0();
+	GfxUseTexture(true);
+#else
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(gUfUseTexture, 1);
+#endif
 
 	int srcX, srcY;
 	float dstX, dstY;
@@ -900,8 +955,13 @@ void TextureData::BltTransformed(const SexyMatrix3 &theTrans, const Rect& theSrc
 	}
 
 	uint32_t aColor = theColor.ToGLColor();
+#ifdef __MORPHOS__
+	GfxSelectTexture0();
+	GfxUseTexture(true);
+#else
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(gUfUseTexture, 1);
+#endif
 
 	int srcX, srcY;
 	float dstX, dstY;
@@ -969,7 +1029,11 @@ void TextureData::BltTransformed(const SexyMatrix3 &theTrans, const Rect& theSrc
 void TextureData::BltTriangles(const TriVertex theVertices[][3], int theNumTriangles,
                                unsigned int theColor, float tx, float ty, bool clampUv)
 {
+#ifdef __MORPHOS__
+	 GfxUseTexture(true);
+#else
 	glUniform1i(gUfUseTexture, 1);
+#endif
 	if (mMaxTotalU <= 1.0 && mMaxTotalV <= 1.0)
 	{
 		// Single-texture fast path
@@ -984,7 +1048,11 @@ void TextureData::BltTriangles(const TriVertex theVertices[][3], int theNumTrian
 			std::max(mMaxTotalU - halfU, midU),
 			std::max(mMaxTotalV - halfV, midV)
 		};
+#ifdef __MORPHOS__
+		GfxSelectTexture0();
+#else
 		glActiveTexture(GL_TEXTURE0);
+#endif	
 		GfxBindTexture(piece.mTexture, uvb, clampUv);
 
 		GfxBegin(GL_TRIANGLES);
@@ -1155,6 +1223,7 @@ int GLInterface::Init(bool IsWindowed)
 		inited = true;
 		PlatformGLInit();
 
+#ifndef __MORPHOS__
 		gProgram = shaderLoad(SHADER_CODE);
 		if (gProgram == 0)
 			return 0;
@@ -1167,6 +1236,7 @@ int GLInterface::Init(bool IsWindowed)
 		glGenBuffers(1, &gVbo);
 		glBindBuffer(GL_ARRAY_BUFFER, gVbo);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(GLVertex) * MAX_VERTICES, nullptr, GL_DYNAMIC_DRAW);
+#endif
 	}
 
 	int aMaxSize;
@@ -1184,19 +1254,32 @@ int GLInterface::Init(bool IsWindowed)
 	gSupportedPixelFormats = PixelFormat_A8R8G8B8 | PixelFormat_A4R4G4B4 | PixelFormat_R5G6B5 | PixelFormat_Palette8;
 	gLinearFilter = false;
 
+#ifdef __MORPHOS__
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0.0, (GLdouble)mWidth, (GLdouble)mHeight, 0.0, -10.0, 10.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glShadeModel(GL_SMOOTH);
+	glDisable(GL_TEXTURE_2D);
+#else
 	glUseProgram(gProgram);
 	float ortho[16];
 	MakeOrthoMatrix(0, (float)mWidth, (float)mHeight, 0, -10, 10, ortho);
 	glUniformMatrix4fv(gUfViewProjMtx, 1, GL_FALSE, ortho);
 	glUniform1i(gUfTexture, 0);
 	glUniform1i(gUfClampUvEnabled, 1);
+#endif
 
 	glEnable(GL_BLEND);
 	glDisable(GL_DITHER);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
+#ifndef __MORPHOS__
 	glDisable(GL_FRAMEBUFFER_SRGB); // Prevent double gamma correction (already sRGB passthrough)
 	glGetError(); // clear GL_INVALID_ENUM on pure GLES implementations
+#endif
 
 	mRGBBits   = 32;
 	mRedBits   = 8; mGreenBits = 8; mBlueBits  = 8;
@@ -1286,9 +1369,18 @@ bool GLInterface::RecoverBits(MemoryImage* theImage)
 			int w = std::min(theImage->mWidth  - offx, piece.mWidth);
 			int h = std::min(theImage->mHeight - offy, piece.mHeight);
 
+#ifdef __MORPHOS__
+			GfxSelectTexture0();
+#else
 			glActiveTexture(GL_TEXTURE0);
+#endif
 			glBindTexture(GL_TEXTURE_2D, piece.mTexture);
 
+#ifdef __MORPHOS__
+			std::vector<uint32_t> buf(piece.mWidth * piece.mHeight);
+			glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+			const int srcPitch = piece.mWidth;
+#else
 			// FBO readback (ES 2.0 has no glGetTexImage)
 			GLuint fbo;
 			glGenFramebuffers(1, &fbo);
@@ -1307,6 +1399,8 @@ bool GLInterface::RecoverBits(MemoryImage* theImage)
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glDeleteFramebuffers(1, &fbo);
+			const int srcPitch = w;
+#endif
 
 			uint32_t* dst = theImage->GetBits() + offy * theImage->GetWidth() + offx;
 			const uint32_t* src = buf.data();
@@ -1314,7 +1408,7 @@ bool GLInterface::RecoverBits(MemoryImage* theImage)
 			{
 				for (int c = 0; c < w; c++)
 					dst[c] = RgbaToArgb(src[c]);
-				src += w;
+				src += srcPitch;
 				dst += theImage->GetWidth();
 			}
 		}
@@ -1454,7 +1548,12 @@ void GLInterface::DrawLine(double x1, double y1, double x2, double y2,
 		fx1 = p1.x; fy1 = p1.y; fx2 = p2.x; fy2 = p2.y;
 	}
 
+#ifdef __MORPHOS__
+	GfxUseTexture(false);
+#else
 	glUniform1i(gUfUseTexture, 0);
+#endif
+
 	uint32_t c = theColor.ToGLColor();
 	GLVertex v[3] = {
 		{ fx1, fy1, 0, c, 0, 0 },
@@ -1493,7 +1592,11 @@ void GLInterface::FillRect(const Rect& theRect, const Color& theColor, int theDr
 		}
 	}
 
+#ifdef __MORPHOS__
+	GfxUseTexture(false);
+#else
 	glUniform1i(gUfUseTexture, 0);
+#endif
 	GfxBegin(GL_TRIANGLE_STRIP);
 	GfxAddVertices(v, 4);
 	GfxEnd();
@@ -1506,8 +1609,11 @@ void GLInterface::DrawTriangle(const TriVertex &p1, const TriVertex &p2, const T
 	SetDrawMode(theDrawMode);
 
 	uint32_t c = theColor.ToGLColor();
+#ifdef __MORPHOS__
+	GfxUseTexture(false);
+#else
 	glUniform1i(gUfUseTexture, 0);
-
+#endif
 	GLVertex v[3] = {
 		{ p1.x, p1.y, 0, GetColorFromTriVertex(p1, c), 0, 0 },
 		{ p2.x, p2.y, 0, GetColorFromTriVertex(p2, c), 0, 0 },
@@ -1568,8 +1674,12 @@ void GLInterface::FillPoly(const Point theVertices[], int theNumVertices,
 	SetDrawMode(theDrawMode);
 
 	uint32_t c = theColor.ToGLColor();
+#ifdef __MORPHOS__
+	GfxUseTexture(false);
+#else
 	glUniform1i(gUfUseTexture, 0);
-
+#endif
+	
 	VertexList vl;
 	for (int i = 0; i < theNumVertices; i++)
 	{

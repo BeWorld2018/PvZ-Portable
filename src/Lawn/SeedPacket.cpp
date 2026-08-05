@@ -590,12 +590,18 @@ void DrawSeedPacket(Graphics* g, float x, float y, SeedType theSeedType, SeedTyp
 		{
 			SexyMatrix3 aMatrix;
 			PvzpScaleTransformMatrix(aMatrix, aTextOffsetX * g->mScaleX + x, aTextOffsetY * g->mScaleY + y, g->mScaleX, g->mScaleY);
+#ifndef __MORPHOS__
+			// fix font
+			g->SetLinearBlend(true);
+			PvzpDrawStringMatrix(g, aTextFont, aMatrix, aCostStr, Color::Black);
+#else
 			if (g->mScaleX > 1.8f)
 			{
 				g->SetLinearBlend(false);
 			}
 			PvzpDrawStringMatrix(g, aTextFont, aMatrix, aCostStr, Color::Black);
 			g->SetLinearBlend(true);
+#endif
 		}
 	}
 

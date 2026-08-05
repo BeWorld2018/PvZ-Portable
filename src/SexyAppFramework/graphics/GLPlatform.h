@@ -25,6 +25,14 @@
 #ifndef __GLPLATFORM_H__
 #define __GLPLATFORM_H__
 
+#include <SDL.h>
+
+#ifdef __MORPHOS__
+
+#include <SDL_opengl.h>
+
+#else
+
 #ifdef __SWITCH__
 #include <switch.h>
 #include <EGL/egl.h>
@@ -42,8 +50,6 @@
 #pragma warning(pop)
 #endif
 
-#include <SDL.h>
-
 // Shared macro definitions — identical keywords in GLSL ES 1.00 and GLSL 1.20
 #define GLSL_VERT_MACROS \
 	"#define VERT_IN attribute\n" \
@@ -57,9 +63,13 @@
 // When true, a desktop GL compatibility context is in use and shaders
 extern bool gDesktopGLFallback;
 
+#endif // __MORPHOS__
+
 inline void PlatformGLInit()
 {
-#ifdef __SWITCH__
+#ifdef __MORPHOS__
+	// no GLAD here 
+#elif defined(__SWITCH__)
 	gladLoadGLES2((GLADloadfunc)eglGetProcAddress);
 #else
 	gladLoadGLES2((GLADloadfunc)SDL_GL_GetProcAddress);

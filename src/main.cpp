@@ -39,6 +39,10 @@ using namespace Sexy;
 #include <emscripten.h>
 #endif
 
+#ifdef __MORPHOS__
+unsigned long __stack = 1024 * 1024 *2;
+static const char *version __attribute__((used)) = "$VER: PlantsVsZombies 0.2.0 (05.08.2026)";
+#endif
 #ifdef _WIN32
 static std::vector<std::string> gUtf8ArgsStorage;
 static std::vector<char*> gUtf8Argv;
