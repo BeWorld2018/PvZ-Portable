@@ -1,7 +1,7 @@
 /*
  * Portions of this file are based on the PopCap Games Framework
  * Copyright (C) 2005-2009 PopCap Games, Inc.
- * 
+ *
  * Copyright (C) 2026 Zhou Qiankang <wszqkzqk@qq.com>
  *
  * SPDX-License-Identifier: LGPL-3.0-or-later AND LicenseRef-PopCap
@@ -164,7 +164,7 @@ static void GfxAddVertices(VertexList &arr)
 }
 
 static void GfxAddVertices(const TriVertex arr[][3], int arrCount, unsigned int theColor,
-                           float tx, float ty, float aMaxTotalU, float aMaxTotalV)
+						   float tx, float ty, float aMaxTotalU, float aMaxTotalV)
 {
 	if (gVertexMode == (GLenum)-1) return;
 	if (arrCount <= 0) return;
@@ -624,9 +624,9 @@ void TextureData::CreateTextureDimensions(MemoryImage *theImage)
 
 	for (auto &p : mTextures)        { p.mTexture = 0; p.mWidth = mTexPieceWidth; p.mHeight = mTexPieceHeight; }
 	for (unsigned i = mTexVecWidth - 1; i < mTextures.size(); i += mTexVecWidth)
-	                                  { mTextures[i].mWidth = aRightWidth;  mTextures[i].mHeight = aRightHeight; }
+									  { mTextures[i].mWidth = aRightWidth;  mTextures[i].mHeight = aRightHeight; }
 	for (unsigned i = mTexVecWidth * (mTexVecHeight - 1); i < mTextures.size(); i++)
-	                                  { mTextures[i].mWidth = aBottomWidth; mTextures[i].mHeight = aBottomHeight; }
+									  { mTextures[i].mWidth = aBottomWidth; mTextures[i].mHeight = aBottomHeight; }
 	mTextures.back().mWidth  = aCornerWidth;
 	mTextures.back().mHeight = aCornerHeight;
 
@@ -642,13 +642,13 @@ void TextureData::CreateTextures(MemoryImage *theImage)
 	theImage->CommitBits();
 
 	if (!theImage->mHasAlpha && !theImage->mHasTrans
-	    && (gSupportedPixelFormats & PixelFormat_R5G6B5)
-	    && !(theImage->mRenderFlags & RenderImageFlag_UseA8R8G8B8))
+		&& (gSupportedPixelFormats & PixelFormat_R5G6B5)
+		&& !(theImage->mRenderFlags & RenderImageFlag_UseA8R8G8B8))
 		aFormat = PixelFormat_R5G6B5;
 
 	if ((theImage->mRenderFlags & RenderImageFlag_UseA4R4G4B4)
-	    && aFormat == PixelFormat_A8R8G8B8
-	    && (gSupportedPixelFormats & PixelFormat_A4R4G4B4))
+		&& aFormat == PixelFormat_A8R8G8B8
+		&& (gSupportedPixelFormats & PixelFormat_A4R4G4B4))
 		aFormat = PixelFormat_A4R4G4B4;
 
 	if (aFormat == PixelFormat_A8R8G8B8 && !(gSupportedPixelFormats & PixelFormat_A8R8G8B8))
@@ -656,8 +656,8 @@ void TextureData::CreateTextures(MemoryImage *theImage)
 
 	bool createTextures = false;
 	if (mWidth != theImage->mWidth || mHeight != theImage->mHeight
-	    || aFormat != mPixelFormat
-	    || (theImage->mRenderFlags & RenderImageFlag_TextureMask) != mImageFlags)
+		|| aFormat != mPixelFormat
+		|| (theImage->mRenderFlags & RenderImageFlag_TextureMask) != mImageFlags)
 	{
 		ReleaseTextures();
 		mPixelFormat = aFormat;
@@ -695,15 +695,15 @@ void TextureData::CreateTextures(MemoryImage *theImage)
 void TextureData::CheckCreateTextures(MemoryImage *theImage)
 {
 	if (mPixelFormat == PixelFormat_Unknown
-	    || theImage->mWidth != mWidth || theImage->mHeight != mHeight
-	    || theImage->mBitsChangedCount != mBitsChangedCount
-	    || (theImage->mRenderFlags & RenderImageFlag_TextureMask) != mImageFlags)
+		|| theImage->mWidth != mWidth || theImage->mHeight != mHeight
+		|| theImage->mBitsChangedCount != mBitsChangedCount
+		|| (theImage->mRenderFlags & RenderImageFlag_TextureMask) != mImageFlags)
 		CreateTextures(theImage);
 }
 
 GLuint& TextureData::GetTexture(int x, int y, int &width, int &height,
-                                float &u1, float &v1, float &u2, float &v2,
-                                float *uvBounds)
+								float &u1, float &v1, float &u2, float &v2,
+								float *uvBounds)
 {
 	int tx = x / mTexPieceWidth, ty = y / mTexPieceHeight;
 	TextureDataPiece &p = mTextures[ty * mTexVecWidth + tx];
@@ -726,8 +726,8 @@ GLuint& TextureData::GetTexture(int x, int y, int &width, int &height,
 }
 
 GLuint& TextureData::GetTextureF(float x, float y, float &width, float &height,
-                                 float &u1, float &v1, float &u2, float &v2,
-                                 float *uvBounds)
+								 float &u1, float &v1, float &u2, float &v2,
+								 float *uvBounds)
 {
 	int tx = (int)(x / mTexPieceWidth), ty = (int)(y / mTexPieceHeight);
 	TextureDataPiece &p = mTextures[ty * mTexVecWidth + tx];
@@ -1027,7 +1027,7 @@ void TextureData::BltTransformed(const SexyMatrix3 &theTrans, const Rect& theSrc
 }
 
 void TextureData::BltTriangles(const TriVertex theVertices[][3], int theNumTriangles,
-                               unsigned int theColor, float tx, float ty, bool clampUv)
+							   unsigned int theColor, float tx, float ty, bool clampUv)
 {
 #ifdef __MORPHOS__
 	 GfxUseTexture(true);
