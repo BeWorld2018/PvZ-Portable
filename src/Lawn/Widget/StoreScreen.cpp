@@ -105,7 +105,7 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
 	mPottedPlantSpecs.InitializePottedPlant(SEED_MARIGOLD);
 	mPottedPlantSpecs.mDrawVariation = (DrawVariation)RandRangeInt(VARIATION_MARIGOLD_WHITE, VARIATION_MARIGOLD_LIGHT_GREEN);
 
-	mBackButton = new NewLawnButton(nullptr, StoreScreen::StoreScreen_Back, this);
+	mBackButton = std::make_unique<NewLawnButton>(nullptr, StoreScreen::StoreScreen_Back, this);
 	mBackButton->mDoFinger = true;
 	mBackButton->SetLabel("[STORE_MAIN_MENU_BUTTON]");
 	Image* aMenuImage = Sexy::IMAGE_STORE_MAINMENUBUTTON;
@@ -113,37 +113,37 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
 	mBackButton->mOverImage = Sexy::IMAGE_STORE_MAINMENUBUTTONHIGHLIGHT;
 	mBackButton->mDownImage = Sexy::IMAGE_STORE_MAINMENUBUTTONDOWN;
 	mBackButton->SetFont(Sexy::FONT_HOUSEOFTERROR20);
-	mBackButton->mColors[ButtonWidget::COLOR_LABEL] = Color(98, 153, 235);
-	mBackButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(167, 192, 235);
+	mBackButton->SetLabelColor(Color(98, 153, 235));
+	mBackButton->SetLabelHiliteColor(Color(167, 192, 235));
 	mBackButton->Resize(366, 512, aMenuImage->mWidth, aMenuImage->mHeight);
 	mBackButton->mTextOffsetX = -7;
 	mBackButton->mTextOffsetY = 1;
 	mBackButton->mTextDownOffsetX = 2;
 	mBackButton->mTextDownOffsetY = 1;
 
-	mPrevButton = new NewLawnButton(nullptr, StoreScreen::StoreScreen_Prev, this);
+	mPrevButton = std::make_unique<NewLawnButton>(nullptr, StoreScreen::StoreScreen_Prev, this);
 	mPrevButton->mDoFinger = true;
 	mPrevButton->SetLabel("");
 	Image* aPrevImage = Sexy::IMAGE_STORE_PREVBUTTON;
 	mPrevButton->mButtonImage = aPrevImage;
 	mPrevButton->mOverImage = Sexy::IMAGE_STORE_PREVBUTTONHIGHLIGHT;
 	mPrevButton->mDownImage = Sexy::IMAGE_STORE_PREVBUTTONHIGHLIGHT;
-	mPrevButton->mColors[ButtonWidget::COLOR_LABEL] = Color(255, 240, 0);
-	mPrevButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(200, 200, 255);
+	mPrevButton->SetLabelColor(Color(255, 240, 0));
+	mPrevButton->SetLabelHiliteColor(Color(200, 200, 255));
 	mPrevButton->Resize(252, 402, aPrevImage->mWidth, aPrevImage->mHeight);
 
-	mNextButton = new NewLawnButton(nullptr, StoreScreen::StoreScreen_Next, this);
+	mNextButton = std::make_unique<NewLawnButton>(nullptr, StoreScreen::StoreScreen_Next, this);
 	mNextButton->mDoFinger = true;
 	mNextButton->SetLabel("");
 	Image* aNextImage = Sexy::IMAGE_STORE_NEXTBUTTON;
 	mNextButton->mButtonImage = aNextImage;
 	mNextButton->mOverImage = Sexy::IMAGE_STORE_NEXTBUTTONHIGHLIGHT;
 	mNextButton->mDownImage = Sexy::IMAGE_STORE_NEXTBUTTONHIGHLIGHT;
-	mNextButton->mColors[ButtonWidget::COLOR_LABEL] = Color(255, 240, 0);
-	mNextButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(200, 200, 255);
+	mNextButton->SetLabelColor(Color(255, 240, 0));
+	mNextButton->SetLabelHiliteColor(Color(200, 200, 255));
 	mNextButton->Resize(596, 402, aNextImage->mWidth, aNextImage->mHeight);
 
-	mOverlayWidget = new StoreScreenOverlay(this);
+	mOverlayWidget = std::make_unique<StoreScreenOverlay>(this);
 	mOverlayWidget->Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
 	if (!IsPageShown(STORE_PAGE_PLANT_UPGRADES))
@@ -160,14 +160,7 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
 	mTrialLockedWhenStoreOpened = mApp->IsTrialStageLocked();
 }
 
-StoreScreen::~StoreScreen()
-{
-	mCoins.DataArrayDispose();
-	if (mBackButton) delete mBackButton;
-	if (mPrevButton) delete mPrevButton;
-	if (mNextButton) delete mNextButton;
-	if (mOverlayWidget) delete mOverlayWidget;
-}
+StoreScreen::~StoreScreen() = default;
 
 StoreItem StoreScreen::GetStoreItemType(int theSpotIndex)
 {
@@ -800,19 +793,19 @@ void StoreScreen::Update()
 void StoreScreen::AddedToManager(WidgetManager* theWidgetManager)
 {
 	WidgetContainer::AddedToManager(theWidgetManager);
-	AddWidget(mBackButton);
-	AddWidget(mPrevButton);
-	AddWidget(mNextButton);
-	AddWidget(mOverlayWidget);
+	AddWidget(mBackButton.get());
+	AddWidget(mPrevButton.get());
+	AddWidget(mNextButton.get());
+	AddWidget(mOverlayWidget.get());
 }
 
 void StoreScreen::RemovedFromManager(WidgetManager* theWidgetManager)
 {
 	WidgetContainer::RemovedFromManager(theWidgetManager);
-	RemoveWidget(mBackButton);
-	RemoveWidget(mPrevButton);
-	RemoveWidget(mNextButton);
-	RemoveWidget(mOverlayWidget);
+	RemoveWidget(mBackButton.get());
+	RemoveWidget(mPrevButton.get());
+	RemoveWidget(mNextButton.get());
+	RemoveWidget(mOverlayWidget.get());
 	mApp->CrazyDaveDie();
 }
 
@@ -972,8 +965,8 @@ void StoreScreen::PurchaseItem(StoreItem theStoreItem)
 			if (theStoreItem == STORE_ITEM_PACKET_UPGRADE)
 			{
 				++mApp->mPlayerInfo->mPurchases[theStoreItem];
-				std::string aDialogLines = StrFormat(
-					mApp->GetString("NOW_YOU_CAN_CHOOSE_X_SEEDS", "Now you can choose to take %d seeds with you per level!").c_str(),
+				std::string aDialogLines = mApp->GetFormattedString(
+					"NOW_YOU_CAN_CHOOSE_X_SEEDS", "Now you can choose to take %d seeds with you per level!",
 					6 + mApp->mPlayerInfo->mPurchases[theStoreItem]);
 				Dialog* aDialog = mApp->DoDialog(DIALOG_UPGRADED, true, mApp->GetString("MORE_SLOTS", "More slots!"), aDialogLines, "[DIALOG_BUTTON_OK]", BUTTONS_FOOTER);
 
@@ -1134,9 +1127,8 @@ void StoreScreen::AdvanceCrazyDaveDialog()
 	}
 }
 
-void StoreScreen::MouseDown(int x, int y, int theClickCount)
+void StoreScreen::MouseDown(int x, int y, [[maybe_unused]] int theClickCount)
 {
-	(void)theClickCount;
 	if (mBubbleClickToContinue)
 	{
 		AdvanceCrazyDaveDialog();
@@ -1160,7 +1152,7 @@ void StoreScreen::MouseDown(int x, int y, int theClickCount)
 			else if (aItemType == STORE_ITEM_PVZ)
 			{
 				mWaitForDialog = true;
-				int aResult = mApp->LawnMessageBox(
+				mApp->LawnMessageBox(
 					DIALOG_MESSAGE, "[BUY_PVZ_TITLE]", "[BUY_PVZ_BODY]", "[GET_FULL_VERSION_YES_BUTTON]", "[GET_FULL_VERSION_NO_BUTTON]", BUTTONS_YES_NO);
 				mWaitForDialog = false;
 			}

@@ -24,6 +24,7 @@
 
 #include "misc/SexyVector.h"
 #include "widget/DialogButton.h"
+#include <memory>
 
 //using namespace std;
 using namespace Sexy;
@@ -38,16 +39,6 @@ public:
 		BUTTON_LABEL_CENTER = 0,
 		BUTTON_LABEL_RIGHT = 1
 	};
-	enum
-	{
-		COLOR_LABEL = 0,
-		COLOR_LABEL_HILITE = 1,
-		COLOR_DARK_OUTLINE = 2,
-		COLOR_LIGHT_OUTLINE = 3,
-		COLOR_MEDIUM_OUTLINE = 4,
-		COLOR_BKG = 5,
-		NUM_COLORS = 6
-	};
 
 public:
 	LawnApp*				mApp;
@@ -59,11 +50,11 @@ public:
 	bool					mIsOver;
 	bool					mIsDown;
 	bool					mDisabled;
-	Color					mColors[6];
+	ButtonColorScheme		mColors;
 	int						mId;
 	std::string				mLabel;
 	int						mLabelJustify;
-	_Font*					mFont;
+	std::unique_ptr<_Font>		mFont;
 	Image*					mButtonImage;
 	Image*					mOverImage;
 	Image*					mDownImage;
@@ -92,6 +83,8 @@ public:
 	static bool	HaveButtonImage(Image* theImage, Rect& theRect);
 	void					DrawButtonImage(Graphics* g, Image* theImage, Rect& theRect, int theX, int theY);
 	void			SetFont(_Font* theFont);
+	void			SetLabelColor(const Color& theColor);
+	void			SetLabelHiliteColor(const Color& theColor);
 	bool			IsButtonDown();
 	void					Draw(Graphics* g);
 	void			SetDisabled(bool theDisabled);
@@ -130,8 +123,8 @@ public:
 	void					SetLabel(std::string_view theLabel);
 };
 
-LawnStoneButton*			MakeButton(int theId, ButtonListener* theListener, std::string_view theText);
-NewLawnButton*				MakeNewButton(int theId, ButtonListener* theListener, std::string_view theText, _Font* theFont, Image* theImageNormal, Image* theImageOver, Image* theImageDown);
+std::unique_ptr<LawnStoneButton>	MakeButton(int theId, ButtonListener* theListener, std::string_view theText);
+std::unique_ptr<NewLawnButton>	MakeNewButton(int theId, ButtonListener* theListener, std::string_view theText, _Font* theFont, Image* theImageNormal, Image* theImageOver, Image* theImageDown);
 void						DrawStoneButton(Graphics* g, int x, int y, int theWidth, int theHeight, bool isDown, bool isHighLighted, const std::string& theLabel);
 
 #endif

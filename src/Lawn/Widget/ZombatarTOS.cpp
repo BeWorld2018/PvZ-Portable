@@ -68,7 +68,7 @@ ZombatarTOS::ZombatarTOS(LawnApp* theApp) : LawnDialog(theApp, Dialogs::DIALOG_Z
 	mArrowAlpha = 0;
 	mArrowFadeDir = 3;
 
-	mTOSSlider = new Slider(IMAGE_ZOMBATAR_TOS_SLIDER, IMAGE_ZOMBATAR_TOS_SLIDER_THUMB, ZombatarTOS::ZombatarTOS_Slider, this);
+	mTOSSlider = std::make_unique<Slider>(IMAGE_ZOMBATAR_TOS_SLIDER, IMAGE_ZOMBATAR_TOS_SLIDER_THUMB, ZombatarTOS::ZombatarTOS_Slider, this);
 	mTOSSlider->mHorizontal = false;
 	mTOSSlider->SetValue(0);
 
@@ -83,30 +83,24 @@ ZombatarTOS::ZombatarTOS(LawnApp* theApp) : LawnDialog(theApp, Dialogs::DIALOG_Z
 	Resize(0, 0, TOS_DIALOG_WIDTH, TOS_DIALOG_HEIGHT);
 }
 
-ZombatarTOS::~ZombatarTOS()
-{
-	delete mTOSSlider;
-	delete mBackButton;
-	delete mAcceptButton;
-	delete mTOSCheckbox;
-}
+ZombatarTOS::~ZombatarTOS() = default;
 
 void ZombatarTOS::AddedToManager(WidgetManager* theWidgetManager)
 {
 	Dialog::AddedToManager(theWidgetManager);
-	AddWidget(mTOSSlider);
-	AddWidget(mBackButton);
-	AddWidget(mAcceptButton);
-	AddWidget(mTOSCheckbox);
+	AddWidget(mTOSSlider.get());
+	AddWidget(mBackButton.get());
+	AddWidget(mAcceptButton.get());
+	AddWidget(mTOSCheckbox.get());
 }
 
 void ZombatarTOS::RemovedFromManager(WidgetManager* theWidgetManager)
 {
 	Dialog::RemovedFromManager(theWidgetManager);
-	RemoveWidget(mTOSSlider);
-	RemoveWidget(mBackButton);
-	RemoveWidget(mAcceptButton);
-	RemoveWidget(mTOSCheckbox);
+	RemoveWidget(mTOSSlider.get());
+	RemoveWidget(mBackButton.get());
+	RemoveWidget(mAcceptButton.get());
+	RemoveWidget(mTOSCheckbox.get());
 }
 
 void ZombatarTOS::Resize(int theX, int theY, int theWidth, int theHeight)
@@ -136,10 +130,11 @@ void ZombatarTOS::Draw(Graphics* g)
 	int aMaxScroll = std::max(0, mTextHeight - TOS_CLIP_HEIGHT);
 	int aOffset = static_cast<int>(mTOSSlider->mVal * aMaxScroll);
 
-	g->PushState();
-	g->ClipRect(Rect(TOS_TEXT_X, TOS_TEXT_Y, TOS_TEXT_WIDTH, TOS_CLIP_HEIGHT));
-	PvzpDrawStringWrapped(g, mBodyText, Rect(TOS_TEXT_X, TOS_TEXT_Y - aOffset, TOS_TEXT_WIDTH, mTextHeight), FONT_PICO129, Color::White, DrawStringJustification::DS_ALIGN_LEFT);
-	g->PopState();
+	{
+		GraphicsStateGuard aStateGuard(*g);
+		g->ClipRect(Rect(TOS_TEXT_X, TOS_TEXT_Y, TOS_TEXT_WIDTH, TOS_CLIP_HEIGHT));
+		PvzpDrawStringWrapped(g, mBodyText, Rect(TOS_TEXT_X, TOS_TEXT_Y - aOffset, TOS_TEXT_WIDTH, mTextHeight), FONT_PICO129, Color::White, DrawStringJustification::DS_ALIGN_LEFT);
+	}
 
 	if (mFlashArrow && IMAGE_ZOMBATAR_TOS_ARROW)
 	{
@@ -171,10 +166,8 @@ void ZombatarTOS::Update()
 	}
 }
 
-void ZombatarTOS::ButtonPress(int theId)
+void ZombatarTOS::ButtonPress([[maybe_unused]] int theId)
 {
-	if (theId == ZombatarTOS::ZombatarTOS_Accept || theId == ZombatarTOS::ZombatarTOS_Back)
-		mApp->PlaySample(SOUND_BUTTONCLICK);
 }
 
 void ZombatarTOS::ButtonDepress(int theId)
@@ -225,6 +218,7 @@ void ZombatarTOS::MouseWheel(int theDelta)
 
 void ZombatarTOS::CheckboxChecked(int theId, bool checked)
 {
+	mApp->PlaySample(SOUND_BUTTONCLICK);
 	if (theId == ZombatarTOS::ZombatarTOS_Checkbox && checked)
 	{
 		mFlashArrow = false;
@@ -232,9 +226,7 @@ void ZombatarTOS::CheckboxChecked(int theId, bool checked)
 	}
 }
 
-void ZombatarTOS::SliderVal(int theId, double theVal)
+void ZombatarTOS::SliderVal([[maybe_unused]] int theId, [[maybe_unused]] double theVal)
 {
-	(void)theId;
-	(void)theVal;
 	MarkDirty();
 }

@@ -20,6 +20,7 @@
  */
 
 #include <climits>
+#include <format>
 
 #include "Plant.h"
 #include "Board.h"
@@ -73,7 +74,7 @@ constexpr Color ZOMBIE_MINDCONTROLLED_COLOR = Color(128, 64, 192, 255);
 
 static std::string ZombatarTrackName(const char* thePrefix, int theIndex)
 {
-	return Sexy::StrFormat("%s%02d", thePrefix, theIndex);
+	return std::format("{}{:02d}", thePrefix, theIndex);
 }
 
 constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
@@ -3684,8 +3685,7 @@ void Zombie::DropHead(unsigned int theDamageFlags)
 	}
 	if (mBoard->mPinataMode && mZombiePhase != ZombiePhase::PHASE_ZOMBIE_MOWERED)
 	{
-		PvzpParticleSystem* aPinataParticle = mApp->AddPvzpParticle(aPosX, aPosY, aRenderOrder, ParticleEffect::PARTICLE_ZOMBIE_PINATA);
-		(void)aPinataParticle; // Unused
+		mApp->AddPvzpParticle(aPosX, aPosY, aRenderOrder, ParticleEffect::PARTICLE_ZOMBIE_PINATA);
 		OverrideParticleScale(aParticle); // Weird, TODO: test the Pinata Mode
 	}
 
@@ -5654,7 +5654,7 @@ void Zombie::DrawReanim(Graphics* g, const ZombieDrawPosition& theDrawPos, int t
 	if (aBodyReanim == nullptr)
 	{
 #ifdef PVZ_DEBUG
-		PvzpTrace("Missing zombie reanimation");
+		PvzpLogLn("Missing zombie reanimation");
 #endif
 		return;
 	}
@@ -8309,6 +8309,7 @@ Rect Zombie::GetZombieRect()
 	if (aDrawPos.mClipHeight > CLIP_HEIGHT_LIMIT)
 	{
 		aZombieRect.mHeight -= aDrawPos.mClipHeight;
+		aZombieRect.mHeight = std::max(aZombieRect.mHeight, 0);
 	}
 
 	return aZombieRect;

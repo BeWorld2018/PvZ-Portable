@@ -28,22 +28,26 @@
 #include "../../PvzpLib/PvzpCommon.h"
 #include "sound/SDLMusicInterface.h"
 
+#include <mutex>
+
 using namespace Sexy;
 
 Music::Music()
 {
 	mApp = (LawnApp*)gSexyAppBase;
-	mMusicInterface = gSexyAppBase->mMusicInterface;
+	mMusicInterface = gSexyAppBase->mMusicInterface.get();
 	mCurMusicTune = MusicTune::MUSIC_TUNE_NONE;
 	mCurMusicFileMain = MusicFile::MUSIC_FILE_NONE;
 	mCurMusicFileDrums = MusicFile::MUSIC_FILE_NONE;
 	mCurMusicFileHihats = MusicFile::MUSIC_FILE_NONE;
 	mBurstOverride = -1;
 	mMusicDrumsState = MusicDrumsState::MUSIC_DRUMS_OFF;
+	mDrumsStateCounter = 0;
 	mQueuedDrumTrackPackedOrder = -1;
 	mBaseBPM = 155;
 	mBaseModSpeed = 3;
 	mMusicBurstState = MusicBurstState::MUSIC_BURST_OFF;
+	mBurstStateCounter = 0;
 	mPauseOffset = 0;
 	mPauseOffsetDrums = 0;
 	mPaused = false;
@@ -71,7 +75,7 @@ const int Music::MUSIC_LOADING_TASKS = MUSIC_LOADING_TASK_WEIGHT * static_cast<i
 bool Music::PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName)
 {
 	Mix_Music* aHMusic = 0;
-	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface;
+	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface.get();
 	std::string aFileName(theFileName);
 	std::string anExt;
 
@@ -105,6 +109,8 @@ bool Music::PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName)
 
 	SDLMusicInfo aMusicInfo;
 	aMusicInfo.mHMusic = aHMusic;
+
+	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
 	anSDL->mMusicMap.insert(SDLMusicMap::value_type(theMusicFile, aMusicInfo));
 	return true;
 }
@@ -168,15 +174,10 @@ void Music::SetupVolumeForTune(MusicTune theMusicTune, float theDrumsVolume, flo
 
 void Music::LoadSong(MusicFile theMusicFile, std::string_view theFileName)
 {
-	PvzpHesitationTrace("preloadsong");
 	if (!PvzpLoadMusic(theMusicFile, theFileName))
 	{
-		PvzpTrace("music failed to load\n");
+		PvzpLogLn("music failed to load");
 		mMusicDisabled = true;
-	}
-	else
-	{
-		PvzpHesitationTrace("song '%.*s'", static_cast<int>(theFileName.size()), theFileName.data());
 	}
 }
 
@@ -197,7 +198,8 @@ void Music::MusicInit()
 
 void Music::MusicCreditScreenInit()
 {
-	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface;
+	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface.get();
+	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
 	if (anSDL->mMusicMap.find((int)MusicFile::MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN) == anSDL->mMusicMap.end())
 		LoadSong(MusicFile::MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN, "sounds/ZombiesOnYourLawn.ogg");
 }
@@ -227,7 +229,8 @@ void Music::StopAllMusic()
 
 Mix_Music* Music::GetMusicHandle(MusicFile theMusicFile)
 {
-	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface;
+	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface.get();
+	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
 	auto anItr = anSDL->mMusicMap.find((int)theMusicFile);
 	PVZP_ASSERT(anItr != anSDL->mMusicMap.end());
 	return anItr->second.mHMusic;
@@ -235,7 +238,8 @@ Mix_Music* Music::GetMusicHandle(MusicFile theMusicFile)
 
 void Music::PlayFromOffset(MusicFile theMusicFile, int theOffset, double theVolume)
 {
-	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface;
+	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface.get();
+	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
 	auto anItr = anSDL->mMusicMap.find((int)theMusicFile);
 	PVZP_ASSERT(anItr != anSDL->mMusicMap.end());
 	SDLMusicInfo* aMusicInfo = &anItr->second;
@@ -375,7 +379,7 @@ void Music::PlayMusic(MusicTune theMusicTune, int theOffset, int theDrumsOffset)
 unsigned long Music::GetMusicOrder(MusicFile theMusicFile)
 {
 	PVZP_ASSERT(theMusicFile != MusicFile::MUSIC_FILE_NONE);
-	return ((SDLMusicInterface*)mApp->mMusicInterface)->GetMusicOrder((int)theMusicFile);
+	return ((SDLMusicInterface*)mApp->mMusicInterface.get())->GetMusicOrder((int)theMusicFile);
 }
 
 void Music::StartBurst()

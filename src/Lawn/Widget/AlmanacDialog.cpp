@@ -19,6 +19,7 @@
  * along with PvZ-Portable. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <format>
 #include "../Board.h"
 #include "../Plant.h"
 #include "../Zombie.h"
@@ -43,44 +44,41 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mOpenPage = ALMANAC_PAGE_INDEX;
 	mSelectedSeed = SEED_PEASHOOTER;
 	mSelectedZombie = ZOMBIE_NORMAL;
-	mZombie = nullptr;
-	mPlant = nullptr;
 	mDrawStandardBack = false;
 	mLoadedResourceNames.push_back("DelayLoad_Almanac");
-	for (size_t i = 0; i < LENGTH(mZombiePerfTest); i++) mZombiePerfTest[i] = nullptr;
 	LawnDialog::Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
 	for (std::string& resource : mLoadedResourceNames)
 		PvzpLoadResources(resource.c_str());
 
-	mCloseButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_CLOSE);
+	mCloseButton = std::make_unique<GameButton>(AlmanacDialog::ALMANAC_BUTTON_CLOSE);
 	mCloseButton->SetLabel("[CLOSE_BUTTON]");
 	mCloseButton->mButtonImage = Sexy::IMAGE_ALMANAC_CLOSEBUTTON;
 	mCloseButton->mOverImage = Sexy::IMAGE_ALMANAC_CLOSEBUTTONHIGHLIGHT;
 	mCloseButton->mDownImage = nullptr;
 	mCloseButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	Color aColor = Color(42, 42, 90);
-	mCloseButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
-	mCloseButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
+	mCloseButton->SetLabelColor(aColor);
+	mCloseButton->SetLabelHiliteColor(aColor);
 	mCloseButton->Resize(676, 567, 89, 26);
 	mCloseButton->mParentWidget = this;
 	mCloseButton->mTextOffsetX = -8;
 	mCloseButton->mTextOffsetY = 1;
 
-	mIndexButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_INDEX);
+	mIndexButton = std::make_unique<GameButton>(AlmanacDialog::ALMANAC_BUTTON_INDEX);
 	mIndexButton->SetLabel("[ALMANAC_INDEX]");
 	mIndexButton->mButtonImage = Sexy::IMAGE_ALMANAC_INDEXBUTTON;
 	mIndexButton->mOverImage = Sexy::IMAGE_ALMANAC_INDEXBUTTONHIGHLIGHT;
 	mIndexButton->mDownImage = nullptr;
 	mIndexButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mIndexButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
-	mIndexButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
+	mIndexButton->SetLabelColor(aColor);
+	mIndexButton->SetLabelHiliteColor(aColor);
 	mIndexButton->Resize(32, 567, 164, 26);
 	mIndexButton->mParentWidget = this;
 	mIndexButton->mTextOffsetX = 8;
 	mIndexButton->mTextOffsetY = 1;
 
-	mPlantButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_PLANT);
+	mPlantButton = std::make_unique<GameButton>(AlmanacDialog::ALMANAC_BUTTON_PLANT);
 	mPlantButton->SetLabel("[VIEW_PLANTS]");
 	mPlantButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
 	mPlantButton->mOverImage = nullptr;
@@ -88,13 +86,13 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mPlantButton->mDisabledImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED;
 	mPlantButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
 	mPlantButton->SetFont(Sexy::FONT_DWARVENTODCRAFT18YELLOW);
-	mPlantButton->mColors[ButtonWidget::COLOR_LABEL] = Color::White;
-	mPlantButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color::White;
+	mPlantButton->SetLabelColor(Color::White);
+	mPlantButton->SetLabelHiliteColor(Color::White);
 	mPlantButton->Resize(130, 345, 156, 42);
 	mPlantButton->mTextOffsetY = -1;
 	mPlantButton->mParentWidget = this;
 
-	mZombieButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_ZOMBIE);
+	mZombieButton = std::make_unique<GameButton>(AlmanacDialog::ALMANAC_BUTTON_ZOMBIE);
 	mZombieButton->SetLabel("[VIEW_ZOMBIES]");
 	mZombieButton->Resize(487, 345, 210, 48);
 	mZombieButton->mDrawStoneButton = true;
@@ -107,11 +105,6 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 
 AlmanacDialog::~AlmanacDialog()
 {
-	if (mCloseButton)	delete mCloseButton;
-	if (mIndexButton)	delete mIndexButton;
-	if (mPlantButton)	delete mPlantButton;
-	if (mZombieButton)	delete mZombieButton;
-
 	ClearPlantsAndZombies();
 }
 
@@ -120,23 +113,20 @@ void AlmanacDialog::ClearPlantsAndZombies()
 	if (mPlant)
 	{
 		mPlant->Die();
-		delete mPlant;
-		mPlant = nullptr;
+		mPlant.reset();
 	}
 	if (mZombie)
 	{
 		mZombie->DieNoLoot();
-		delete mZombie;
-		mZombie = nullptr;
+		mZombie.reset();
 	}
-	for (Zombie* &aZombie : mZombiePerfTest)
+	for (std::unique_ptr<Zombie>& aZombie : mZombiePerfTest)
 	{
 		if (aZombie)
 		{
 			aZombie->DieNoLoot();
-			delete aZombie;
+			aZombie.reset();
 		}
-		aZombie = nullptr;
 	}
 }
 
@@ -158,7 +148,7 @@ void AlmanacDialog::SetupPlant()
 	else if (mSelectedSeed == SEED_INSTANT_COFFEE)	aPosY += 20;
 	else if (mSelectedSeed == SEED_GRAVEBUSTER)		aPosY += 55;
 
-	mPlant = new Plant();
+	mPlant = std::make_unique<Plant>();
 	mPlant->mBoard = nullptr;
 	mPlant->mIsOnBoard = false;
 	mPlant->PlantInitialize(0, 0, mSelectedSeed, SEED_NONE);
@@ -170,7 +160,7 @@ void AlmanacDialog::SetupZombie()
 {
 	ClearPlantsAndZombies();
 
-	mZombie = new Zombie();
+	mZombie = std::make_unique<Zombie>();
 	mZombie->mBoard = nullptr;
 	mZombie->ZombieInitialize(0, mSelectedZombie, false, nullptr, Zombie::ZOMBIE_WAVE_UI);
 	mZombie->mPosX = ALMANAC_ZOMBIE_POSITION_X;
@@ -184,14 +174,14 @@ void AlmanacDialog::SetPage(AlmanacPage thePage)
 
 	if (mOpenPage == AlmanacPage::ALMANAC_PAGE_INDEX)
 	{
-		mPlant = new Plant();
+		mPlant = std::make_unique<Plant>();
 		mPlant->mBoard = nullptr;
 		mPlant->mIsOnBoard = false;
 		mPlant->PlantInitialize(0, 0, SeedType::SEED_SUNFLOWER, SeedType::SEED_NONE);
 		mPlant->mX = ALMANAC_INDEXPLANT_POSITION_X;
 		mPlant->mY = ALMANAC_INDEXPLANT_POSITION_Y;
 
-		mZombie = new Zombie();
+		mZombie = std::make_unique<Zombie>();
 		mZombie->mBoard = nullptr;
 		mZombie->ZombieInitialize(0, ZombieType::ZOMBIE_NORMAL, false, nullptr, Zombie::ZOMBIE_WAVE_UI);
 		mZombie->mPosX = ALMANAC_INDEXZOMBIE_POSITION_X;
@@ -235,7 +225,7 @@ void AlmanacDialog::Update()
 	mZombieButton->Update();
 	if (mPlant) mPlant->Update();
 	if (mZombie) mZombie->Update();
-	for (Zombie* aZombie : mZombiePerfTest)
+	for (const std::unique_ptr<Zombie>& aZombie : mZombiePerfTest)
 	{
 		if (aZombie)
 		{
@@ -344,13 +334,13 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 	g->DrawImage(Sexy::IMAGE_ALMANAC_PLANTCARD, 459, 86);
 	const PlantDefinition& aPlantDef = GetPlantDefinition(mSelectedSeed);
 	std::string aName = Plant::GetNameString(mSelectedSeed, SEED_NONE);
-	std::string aDescriptionName = StrFormat("[%s_DESCRIPTION]", aPlantDef.mPlantName);
+	std::string aDescriptionName = std::format("[{}_DESCRIPTION]", aPlantDef.mPlantName);
 	PvzpDrawString(g, aName, 617, 288, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 	PvzpDrawStringWrapped(g, aDescriptionName, Rect(485, 309, 258, 230), Sexy::FONT_BRIANNETOD12, Color(40, 50, 90), DS_ALIGN_LEFT);
 
 	if (mSelectedSeed != SeedType::SEED_IMITATER)
 	{
-		std::string aCostStr = PvzpReplaceString(StrFormat("{KEYWORD}{COST}:{STAT} %d", aPlantDef.mSeedCost), "{COST}", "[COST]");
+		std::string aCostStr = PvzpReplaceString(std::format("{{KEYWORD}}{{COST}}:{{STAT}} {}", aPlantDef.mSeedCost), "{COST}", "[COST]");
 		PvzpDrawStringWrapped(g, aCostStr, Rect(485, 520, 134, 50), Sexy::FONT_BRIANNETOD12, Color::White, DS_ALIGN_LEFT);
 
 		std::string aRechargeStr = PvzpReplaceString(
@@ -469,14 +459,14 @@ void AlmanacDialog::DrawZombies(Graphics* g)
 	g->DrawImage(Sexy::IMAGE_ALMANAC_ZOMBIECARD, 455, 78);
 
 	const ZombieDefinition& aZombieDef = GetZombieDefinition(mSelectedZombie);
-	std::string aName = ZombieHasSilhouette(mSelectedZombie) ? "???" : StrFormat("[%s]", aZombieDef.mZombieName);
+	std::string aName = ZombieHasSilhouette(mSelectedZombie) ? "???" : std::format("[{}]", aZombieDef.mZombieName);
 	PvzpDrawString(g, aName, 613, 362, Sexy::FONT_DWARVENTODCRAFT18GREENINSET, Color(190, 255, 235, 255), DS_ALIGN_CENTER);
 
 	std::string aDescription;
 	DrawStringJustification aAlign;
 	if (ZombieHasDescription(mSelectedZombie))
 	{
-		aDescription = PvzpStringTranslate(StrFormat("[%s_DESCRIPTION]", aZombieDef.mZombieName));
+		aDescription = PvzpStringTranslate(std::format("[{}_DESCRIPTION]", aZombieDef.mZombieName));
 		aAlign = DS_ALIGN_LEFT;
 	}
 	else
@@ -514,7 +504,7 @@ void AlmanacDialog::Draw(Graphics* g)
 	case AlmanacPage::ALMANAC_PAGE_ZOMBIES:	DrawZombies(g);	break;
 	}
 
-	for (Zombie* aZombie : mZombiePerfTest)
+	for (const std::unique_ptr<Zombie>& aZombie : mZombiePerfTest)
 	{
 		if (aZombie)
 		{
@@ -646,18 +636,16 @@ ZombieType AlmanacDialog::ZombieHitTest(int x, int y)
 	return ZombieType::ZOMBIE_INVALID;
 }
 
-void AlmanacDialog::MouseUp(int x, int y, int theClickCount)
+void AlmanacDialog::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int theClickCount)
 {
-	(void)x;(void)y;(void)theClickCount;
 	if (mPlantButton->IsMouseOver())		SetPage(ALMANAC_PAGE_PLANTS);
 	else if (mZombieButton->IsMouseOver())	SetPage(ALMANAC_PAGE_ZOMBIES);
 	else if (mCloseButton->IsMouseOver())	mApp->KillAlmanacDialog();
 	else if (mIndexButton->IsMouseOver())	SetPage(ALMANAC_PAGE_INDEX);
 }
 
-void AlmanacDialog::MouseDown(int x, int y, int theClickCount)
+void AlmanacDialog::MouseDown(int x, int y, [[maybe_unused]] int theClickCount)
 {
-	(void)theClickCount;
 	if (mPlantButton->IsMouseOver() || mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver())
 		mApp->PlaySample(Sexy::SOUND_TAP);
 	if (mZombieButton->IsMouseOver())

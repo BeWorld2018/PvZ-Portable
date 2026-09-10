@@ -39,6 +39,7 @@
 #include "graphics/SharedImage.h"
 #include "misc/Ratio.h"
 #include <atomic>
+#include <memory>
 
 struct SDL_Cursor;
 
@@ -182,15 +183,14 @@ public:
 
 	bool					mOnlyAllowOneCopyToRun;
 	unsigned int			mNotifyGameMessage;
-	std::mutex				mCritSect;
 	uchar					mAdd8BitMaxTable[512];
-	WidgetManager*			mWidgetManager;
+	std::unique_ptr<WidgetManager>	mWidgetManager;
 	DialogMap				mDialogMap;
 	DialogList				mDialogList;
 	std::thread::id			mPrimaryThreadId;
 	std::thread				mLoadingThread;
 	bool					mSEHOccured;
-	bool					mShutdown;
+	std::atomic<bool>		mShutdown;
 	bool					mExitToTop;
 	bool					mIsWindowed;
 	bool					mIsPhysWindowed;
@@ -205,9 +205,10 @@ public:
 	bool					mNoDefer;
 	bool					mFullScreenPageFlip;
 	bool					mTabletPC;
-	GLInterface*			mGLInterface;
+	MemoryImageSet			mMemoryImageSet; // must outlive mGLInterface: ~GLImage -> RemoveMemoryImage()
+	std::unique_ptr<GLInterface>	mGLInterface;
 	bool					mAlphaDisabled;
-	MusicInterface*			mMusicInterface;
+	std::unique_ptr<MusicInterface>	mMusicInterface;
 	bool					mReadFromRegistry;
 	std::string				mRegisterLink;
 	std::string				mProductVersion;
@@ -224,7 +225,6 @@ public:
 	int						mAutoMuteCount;
 	bool					mDemoMute;
 	bool					mMuteOnLostFocus;
-	MemoryImageSet			mMemoryImageSet;
 	SharedImageMap			mSharedImageMap;
 	std::atomic<bool>		mCleanupSharedImages;
 
@@ -243,6 +243,7 @@ public:
 	uint					mSleepCount;
 	uint					mDrawCount;
 	uint					mUpdateCount;
+	uint32_t				mStartTick;
 	int						mUpdateAppState;
 	int						mUpdateAppDepth;
 	double					mUpdateMultiplier;
@@ -259,8 +260,8 @@ public:
 	SDL_Cursor*				mCustomCursor;
 	Image*					mCustomCursorImage;
 	int						mCustomCursorImageNum;
-	SoundManager*			mSoundManager;
-	_Font*					mDefaultFont = nullptr; // app-injected fallback for widgets without an explicit font
+	std::unique_ptr<SoundManager>	mSoundManager;
+	std::atomic<_Font*>		mDefaultFont = nullptr; // app-injected fallback for widgets without an explicit font
 	WidgetSafeDeleteList	mSafeDeleteList;
 	bool					mMouseIn;
 	bool					mRunning;
@@ -274,11 +275,11 @@ public:
 	int						mShowFPSMode;
 	uint					mScreenBltTime;
 	bool					mAutoStartLoadingThread;
-	bool					mLoadingThreadStarted;
-	bool					mLoadingThreadCompleted;
+	std::atomic<bool>		mLoadingThreadStarted;
+	std::atomic<bool>		mLoadingThreadCompleted;
 	bool					mLoaded;
 	bool					mYieldMainThread;
-	bool					mLoadingFailed;
+	std::atomic<bool>		mLoadingFailed;
 	bool					mCursorThreadRunning;
 	bool					mSysCursor;
 	bool					mCustomCursorsEnabled;
@@ -288,8 +289,8 @@ public:
 	bool					mWriteToSexyCache;
 	bool					mSexyCacheBuffers;
 
-	int						mNumLoadingThreadTasks;
-	int						mCompletedLoadingThreadTasks;
+	std::atomic<int>		mNumLoadingThreadTasks;
+	std::atomic<int>		mCompletedLoadingThreadTasks;
 
 	// For recording/playback of program control
 	bool					mRecordingDemoBuffer;
@@ -349,7 +350,7 @@ public:
 	StringIntMap			mIntProperties;
 	StringDoubleMap			mDoubleProperties;
 	StringStringVectorMap	mStringVectorProperties;
-	ResourceManager*		mResourceManager;
+	std::unique_ptr<ResourceManager>	mResourceManager;
 
 protected:
 	void					RehupFocus();
@@ -459,6 +460,7 @@ public:
 	virtual void			HandleGameAlreadyRunning();
 
 	virtual void			Start();
+	void					LogPerfStats();
 	virtual void			Init();
 	virtual void			PreGLInterfaceInitHook();
 	virtual void			PostGLInterfaceInitHook();
@@ -538,7 +540,7 @@ public:
 	bool					StartTextInput(std::string& theInput); // set theInput and return true if using soft keyboard capability and user pressed OK (e.g. Switch libnx swkbd)
 	void					StopTextInput();
 	void					SetTextInputRect(const Rect& theRect); // caret rect in logical coords; anchors the IME UI (candidate window, keyboard pan)
-	bool					Is3DAccelerated();
+	bool					Is3DAccelerated() { return true; }
 	bool					Is3DAccelerationSupported();
 	bool					Is3DAccelerationRecommended();
 	void					DemoSyncRefreshRate();

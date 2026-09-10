@@ -26,6 +26,7 @@
 #define __EDITWIDGET_H__
 
 #include "Widget.h"
+#include <memory>
 
 namespace Sexy
 {
@@ -33,27 +34,27 @@ namespace Sexy
 class _Font;
 class EditListener;
 
+struct EditWidgetColorScheme
+{
+	Color					mBkg;
+	Color					mOutline;
+	Color					mText;
+	Color					mHilite;
+	Color					mHiliteText;
+};
+
 class EditWidget : public Widget
 {
 public:
-	enum
-	{
-		COLOR_BKG,
-		COLOR_OUTLINE,
-		COLOR_TEXT,
-		COLOR_HILITE,
-		COLOR_HILITE_TEXT,
-		NUM_COLORS
-	};
-
 	int						mId;
 	std::string				mString;
-	_Font*					mFont;
+	std::unique_ptr<_Font>		mFont;
+	EditWidgetColorScheme	mColors;
 
 	struct WidthCheck
 	{
-		_Font *mFont;
-		int mWidth;
+		std::unique_ptr<_Font>	mFont;
+		int						mWidth;
 	};
 	typedef std::list<WidthCheck> WidthCheckList;
 	WidthCheckList				mWidthCheckList;
@@ -87,6 +88,7 @@ protected:
 
 public:
 	virtual void			SetFont(_Font* theFont, _Font* theWidthCheckFont = nullptr);
+	virtual void			SetColors(const EditWidgetColorScheme& theColors);
 	virtual void			SetText(const std::string& theText, bool leftPosToZero = true);
 	virtual bool			IsPartOfWord(char32_t theChar);
 	virtual int				GetCharAt(int x, int y);

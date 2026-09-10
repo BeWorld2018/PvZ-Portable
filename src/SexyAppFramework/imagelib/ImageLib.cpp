@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <memory>
 #include <string_view>
 #include <mutex>
 #include <unordered_set>
@@ -53,13 +54,9 @@ Image::Image()
 {
 	mWidth = 0;
 	mHeight = 0;
-	mBits = nullptr;
 }
 
-Image::~Image()
-{
-	delete[] mBits;
-}
+Image::~Image() = default;
 
 int	Image::GetWidth()
 {
@@ -73,7 +70,7 @@ int	Image::GetHeight()
 
 uint32_t* Image::GetBits()
 {
-	return mBits;
+	return mBits.get();
 }
 
 // PNG Pak Support
@@ -127,11 +124,18 @@ Image* GetPNGImage(const std::string& theFileName)
     * the normal method of doing things with libpng).  REQUIRED unless you
     * set up your own error handlers in the png_create_read_struct() earlier.
     */
+
+	// must be volatile: assigned after setjmp, read in the error path after longjmp
+	png_bytep* volatile row_pointers = nullptr;
+	uint32_t* volatile aBits = nullptr;
+
 	if (setjmp(png_jmpbuf(png_ptr)))
 	{
 		/* Free all of the memory associated with the png_ptr and info_ptr */
 		png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)nullptr);
 		p_fclose(fp);
+		delete[] (png_bytep*)row_pointers;
+		delete[] (uint32_t*)aBits;
 		/* If we get here, we had a problem reading the file */
 		return nullptr;
 	}
@@ -154,8 +158,11 @@ Image* GetPNGImage(const std::string& theFileName)
 	png_bytep rawPixels = new png_byte[rowBytes * height];
 
 	png_bytep* row_pointers = new png_bytep[height];
-	for (png_uint_32 y = 0; y < height; y++)
-		row_pointers[y] = rawPixels + y * rowBytes;
+	aBits = new uint32_t[width * height];
+	for (uint i = 0; i < height; i++)
+	{
+		row_pointers[i] = (png_bytep)(aBits + i * width);
+	}
 
 	png_read_image(png_ptr, row_pointers);
 
@@ -189,7 +196,7 @@ Image* GetPNGImage(const std::string& theFileName)
 	Image* anImage = new Image();
 	anImage->mWidth = width;
 	anImage->mHeight = height;
-	anImage->mBits = aBits;
+	anImage->mBits.reset(aBits);
 
 	return anImage;
 }
@@ -253,14 +260,14 @@ Image* GetTGAImage(const std::string& theFileName)
 
 	anImage->mWidth = anImageWidth;
 	anImage->mHeight = anImageHeight;
-	anImage->mBits = new uint32_t[anImageWidth*anImageHeight];
+	anImage->mBits = std::make_unique<uint32_t[]>(anImageWidth*anImageHeight);
 
-	p_fread(anImage->mBits, 4, anImage->mWidth*anImage->mHeight, aTGAFile);
+	p_fread(anImage->mBits.get(), 4, anImage->mWidth*anImage->mHeight, aTGAFile);
 
 	// TGA stores BGRA in LE; on BE need to byteswap each pixel
 	if constexpr (std::endian::native == std::endian::big)
 	{
-		uint32_t* ptr = anImage->mBits;
+		uint32_t* ptr = anImage->mBits.get();
 		for (int i = 0; i < anImageWidth * anImageHeight; i++, ptr++)
 			*ptr = Sexy::ByteSwap32(*ptr);
 	}
@@ -284,8 +291,7 @@ Image* GetGIFImage(const std::string& theFileName)
 	#define LSBFirstOrder(x,y)  (((y) << 8) | (x))
 
 	int
-		opacity,
-		status;
+		opacity;
 
 	int i;
 
@@ -295,49 +301,44 @@ Image* GetGIFImage(const std::string& theFileName)
 		background,			// background color index in the global colormap
 		c,
 		flag,				// packed flag byte
-		*global_colormap,
 		header[1664],
 		magick[12];
 
+	std::unique_ptr<unsigned char[]> global_colormap;
+
 	unsigned int
-		delay,
-		dispose,
-		global_colors,
-		image_count,
-		iterations;
+		global_colors;
 
 	/*
 	Open image file.
 	*/
 
-	PFILE *fp;
+	std::unique_ptr<PFILE, decltype(&p_fclose)> fp(p_fopen(theFileName.c_str(), "rb"), &p_fclose);
 
-	if ((fp = p_fopen(theFileName.c_str(), "rb")) == nullptr)
+	if (fp == nullptr)
 		return nullptr;
 	/*
 	Determine if this is a GIF file.
 	*/
-	status = p_fread(magick, sizeof(char), 6, fp);
-	(void)status; // unused
+	p_fread(magick, sizeof(char), 6, fp.get());
 
 	// a valid GIF file starts with a "GIF87" or "GIF89" signature
 	if (((strncmp((char*)magick, "GIF87", 5) != 0) && (strncmp((char*)magick, "GIF89", 5) != 0)))
 		return nullptr;
 
 	global_colors = 0;
-	global_colormap = (unsigned char*)nullptr;
 
 	uint16_t pw;  // image width
 	uint16_t ph;  // image height
 
 	// read the 7-byte logical screen descriptor
-	p_fread(&pw, sizeof(short), 1, fp);
-	p_fread(&ph, sizeof(short), 1, fp);
+	p_fread(&pw, sizeof(short), 1, fp.get());
+	p_fread(&ph, sizeof(short), 1, fp.get());
 	pw = Sexy::FromLE16(pw);
 	ph = Sexy::FromLE16(ph);
-	p_fread(&flag, sizeof(char), 1, fp);
-	p_fread(&background, sizeof(char), 1, fp);  // only meaningful when a global colormap exists
-	p_fread(&c, sizeof(char), 1, fp);  // pixel aspect ratio
+	p_fread(&flag, sizeof(char), 1, fp.get());
+	p_fread(&background, sizeof(char), 1, fp.get());  // only meaningful when a global colormap exists
+	p_fread(&c, sizeof(char), 1, fp.get());  // pixel aspect ratio
 
 	if (BitSet(flag, 0x80))  // global colormap present
 	{
@@ -345,22 +346,16 @@ Image* GetGIFImage(const std::string& theFileName)
 		opacity global colormap.
 		*/
 		global_colors = 1 << ((flag & 0x07) + 1);  // lowest 3 bits give N; table size = 2^(N+1)
-		global_colormap = new unsigned char[3 * global_colors];  // 3 bytes per color, RGB
-		if (global_colormap == (unsigned char*)nullptr)
-			return nullptr;
+		global_colormap = std::make_unique<unsigned char[]>(3 * global_colors);  // 3 bytes per color, RGB
 
-		p_fread(global_colormap, sizeof(char), 3 * global_colors, fp);
+		p_fread(global_colormap.get(), sizeof(char), 3 * global_colors, fp.get());
 	}
 
-	delay = 0;
-	dispose = 0;
-	iterations = 1;
 	opacity = (-1);
-	image_count = 0;
 
 	for (; ; )
 	{
-		if (p_fread(&c, sizeof(char), 1, fp) == 0)
+		if (p_fread(&c, sizeof(char), 1, fp.get()) == 0)
 			break;  // on read error or EOF, bail out and return nullptr
 
 		if (c == ';')
@@ -370,7 +365,7 @@ Image* GetGIFImage(const std::string& theFileName)
 			/*
 			GIF Extension block.
 			*/
-			p_fread(&c, sizeof(char), 1, fp);  // read the extension label
+			p_fread(&c, sizeof(char), 1, fp.get());  // read the extension label
 
 			switch (c)
 			{
@@ -379,11 +374,8 @@ Image* GetGIFImage(const std::string& theFileName)
 				/*
 				Read Graphics Control extension.
 				*/
-				while (ReadBlobBlock(fp, (char*)header) > 0);
+				while (ReadBlobBlock(fp.get(), (char*)header) > 0);
 
-				dispose = header[0] >> 2;
-				delay = (header[2] << 8) | header[1];
-				(void)delay; // Unused
 				if ((header[0] & 0x01) == 1)
 					opacity = header[3];
 				break;
@@ -393,28 +385,21 @@ Image* GetGIFImage(const std::string& theFileName)
 				/*
 				Read/Discard Comment extension.
 				*/
-				while (ReadBlobBlock(fp, (char*)header) > 0);
+				while (ReadBlobBlock(fp.get(), (char*)header) > 0);
 				break;
 			}
 			case 0xff:
 			{
-				int
-					loop;
-
 				/*
 				Read Netscape Loop extension.
 				*/
-				loop = false;
-				if (ReadBlobBlock(fp, (char*)header) > 0)
-					loop = !strncmp((char*)header, "NETSCAPE2.0", 11);
-				while (ReadBlobBlock(fp, (char*)header) > 0)
-					if (loop)
-						iterations = (header[2] << 8) | header[1];
+				ReadBlobBlock(fp.get(), (char*)header);
+				while (ReadBlobBlock(fp.get(), (char*)header) > 0);
 				break;
 			}
 			default:
 			{
-				while (ReadBlobBlock(fp, (char*)header) > 0);
+				while (ReadBlobBlock(fp.get(), (char*)header) > 0);
 				break;
 			}
 			}
@@ -423,8 +408,6 @@ Image* GetGIFImage(const std::string& theFileName)
 		if (c != ',')  // not an image descriptor
 			continue;
 
-		image_count++;
-
 		uint16_t pagex;
 		uint16_t pagey;
 		uint16_t width;
@@ -432,26 +415,21 @@ Image* GetGIFImage(const std::string& theFileName)
 		int colors;
 		bool interlaced;
 
-		p_fread(&pagex, sizeof(short), 1, fp);
-		p_fread(&pagey, sizeof(short), 1, fp);
-		p_fread(&width, sizeof(short), 1, fp);
-		p_fread(&height, sizeof(short), 1, fp);
+		p_fread(&pagex, sizeof(short), 1, fp.get());
+		p_fread(&pagey, sizeof(short), 1, fp.get());
+		p_fread(&width, sizeof(short), 1, fp.get());
+		p_fread(&height, sizeof(short), 1, fp.get());
 		pagex = Sexy::FromLE16(pagex);
 		pagey = Sexy::FromLE16(pagey);
 		width = Sexy::FromLE16(width);
 		height = Sexy::FromLE16(height);
-		p_fread(&flag, sizeof(char), 1, fp);
+		p_fread(&flag, sizeof(char), 1, fp.get());
 
 		colors = !BitSet(flag, 0x80) ? global_colors : 1 << ((flag & 0x07) + 1);  // use the local colormap if present, else the global one
-		uint32_t* colortable = new uint32_t[colors];
+		auto colortable = std::make_unique<uint32_t[]>(colors);
 
 		interlaced = BitSet(flag, 0x40);
 
-		delay = 0;
-		dispose = 0;
-		(void)dispose; // unused
-		iterations = 1;
-		(void)iterations; //unused
 		if ((width == 0) || (height == 0))
 			return nullptr;
 		if (!BitSet(flag, 0x80))
@@ -459,7 +437,7 @@ Image* GetGIFImage(const std::string& theFileName)
 			/*
 			Use global colormap.
 			*/
-			p = global_colormap;
+			p = global_colormap.get();
 			for (i = 0; i < (int)colors; i++)
 			{
 				int r = *p++;
@@ -471,20 +449,16 @@ Image* GetGIFImage(const std::string& theFileName)
 		}
 		else
 		{
-			unsigned char
-				* colormap;
-
 			/*
 			Read local colormap.
 			*/
-			colormap = new unsigned char[3 * colors];
+			auto colormap = std::make_unique<unsigned char[]>(3 * colors);
 
-			int pos = p_ftell(fp);
-			(void)pos; // unused
+			[[maybe_unused]] int pos = p_ftell(fp.get());
 
-			p_fread(colormap, sizeof(char), 3 * colors, fp);
+			p_fread(colormap.get(), sizeof(char), 3 * colors, fp.get());
 
-			p = colormap;
+			p = colormap.get();
 			for (i = 0; i < (int)colors; i++)
 			{
 				int r = *p++;
@@ -493,17 +467,12 @@ Image* GetGIFImage(const std::string& theFileName)
 
 				colortable[i] = 0xFF000000 | (r << 16) | (g << 8) | (b);
 			}
-			delete[] colormap;
 		}
 
-		if (global_colormap != nullptr)
-		{
-			delete[] global_colormap;
-			global_colormap = nullptr;
-		}
+		global_colormap.reset();
 
-#define MaxStackSize  4096
-#define NullCode  (-1)
+constexpr const int MaxStackSize = 4096;
+constexpr const int NullCode = -1;
 
 		int
 			available,
@@ -526,40 +495,33 @@ Image* GetGIFImage(const std::string& theFileName)
 		unsigned int
 			datum;
 
-		short
-			* prefix;
+		std::unique_ptr<short[]> prefix;
 
 		unsigned char
 			data_size,
 			first,
-			* packet,
-			* pixel_stack,
-			* suffix,
 			* top_stack;
+
+		std::unique_ptr<unsigned char[]>
+			packet,
+			pixel_stack,
+			suffix;
 
 		/*
 		Allocate decoder tables.
 		*/
 
-		packet = new unsigned char[256];
-		prefix = new short[MaxStackSize];
-		suffix = new unsigned char[MaxStackSize];
-		pixel_stack = new unsigned char[MaxStackSize + 1];
+		packet = std::make_unique<unsigned char[]>(256);
+		prefix = std::make_unique<short[]>(MaxStackSize);
+		suffix = std::make_unique<unsigned char[]>(MaxStackSize);
+		pixel_stack = std::make_unique<unsigned char[]>(MaxStackSize + 1);
 
 		/*
 		Initialize GIF data stream decoder.
 		*/
-		p_fread(&data_size, sizeof(char), 1, fp);
+		p_fread(&data_size, sizeof(char), 1, fp.get());
 		if (data_size < 2 || data_size > 11)
-		{
-			delete[] pixel_stack;
-			delete[] suffix;
-			delete[] prefix;
-			delete[] packet;
-			delete[] colortable;
-			p_fclose(fp);
 			return nullptr;
-		}
 		clear = 1 << data_size;
 		end_of_information = clear + 1;
 		available = clear + 2;
@@ -581,7 +543,7 @@ Image* GetGIFImage(const std::string& theFileName)
 		first = 0;
 		offset = 0;
 		pass = 0;
-		top_stack = pixel_stack;
+		top_stack = pixel_stack.get();
 
 		uint32_t* aBits = new uint32_t[width * height];
 
@@ -595,7 +557,7 @@ Image* GetGIFImage(const std::string& theFileName)
 
 			for (x = 0; x < (int)width; )
 			{
-				if (top_stack == pixel_stack)
+				if (top_stack == pixel_stack.get())
 				{
 					if (bits < code_size)
 					{
@@ -607,13 +569,12 @@ Image* GetGIFImage(const std::string& theFileName)
 							/*
 							Read a new data block.
 							*/
-							int pos = p_ftell(fp);
-							(void)pos; // unused
+							[[maybe_unused]] int pos = p_ftell(fp.get());
 
-							count = ReadBlobBlock(fp, (char*)packet);
+							count = ReadBlobBlock(fp.get(), (char*)packet.get());
 							if (count <= 0)
 								break;
-							c = packet;
+							c = packet.get();
 						}
 						datum += (*c) << bits;
 						bits += 8;
@@ -742,25 +703,16 @@ Image* GetGIFImage(const std::string& theFileName)
 			if (x < width)
 				break;
 		}
-		delete[] pixel_stack;
-		delete[] suffix;
-		delete[] prefix;
-		delete[] packet;
-
-		delete[] colortable;
 
 		Image* anImage = new Image();
 
 		anImage->mWidth = width;
 		anImage->mHeight = height;
-		anImage->mBits = aBits;
+		anImage->mBits.reset(aBits);
 
 		//TODO: Change for animation crap
-		p_fclose(fp);
 		return anImage;
 	}
-
-	p_fclose(fp);
 
 	return nullptr;
 }
@@ -802,12 +754,16 @@ bool ImageLib::WriteJPEGImage(const std::string& theFileName, Image* theImage)
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
 
+	// must be volatile: assigned after setjmp, read in the error path after longjmp
+	unsigned char* volatile aTempBuffer = nullptr;
+
 	if (setjmp(jerr.setjmp_buffer))
 	{
 		/* If we get here, the JPEG code has signaled an error.
 		 * We need to clean up the JPEG object, close the input file, and return.
 		 */
 		jpeg_destroy_compress(&cinfo);
+		delete[] (unsigned char*)aTempBuffer;
 		fclose(fp);
 		return false;
 	}
@@ -828,9 +784,9 @@ bool ImageLib::WriteJPEGImage(const std::string& theFileName, Image* theImage)
 
 	int row_stride = theImage->GetWidth() * 3;
 
-	unsigned char* aTempBuffer = new unsigned char[row_stride];
+	aTempBuffer = new unsigned char[row_stride];
 
-	uint32_t* aSrcPtr = theImage->mBits;
+	uint32_t* aSrcPtr = theImage->mBits.get();
 
 	for (int aRow = 0; aRow < theImage->mHeight; aRow++)
 	{
@@ -845,10 +801,12 @@ bool ImageLib::WriteJPEGImage(const std::string& theFileName, Image* theImage)
 			*aDest++ = (src      ) & 0xFF;
 		}
 
-		jpeg_write_scanlines(&cinfo, &aTempBuffer, 1);
+		unsigned char* aRowBuffer = aTempBuffer;
+		jpeg_write_scanlines(&cinfo, &aRowBuffer, 1);
 	}
 
 	delete [] aTempBuffer;
+	aTempBuffer = nullptr; // jpeg_finish_compress may still longjmp; avoid double delete in the error path
 
 	jpeg_finish_compress(&cinfo);
 	jpeg_destroy_compress(&cinfo);
@@ -917,7 +875,7 @@ bool ImageLib::WritePNGImage(const std::string& theFileName, Image* theImage)
 
 	for (int i = 0; i < theImage->mHeight; i++)
 	{
-		png_bytep aRowPtr = (png_bytep) (theImage->mBits + i*theImage->mWidth);
+		png_bytep aRowPtr = (png_bytep) (theImage->mBits.get() + i*theImage->mWidth);
 		png_write_rows(png_ptr, &aRowPtr, 1);
 	}
 
@@ -983,11 +941,11 @@ bool ImageLib::WriteTGAImage(const std::string& theFileName, Image* theImage)
 
 	if constexpr (std::endian::native == std::endian::little)
 	{
-		fwrite(theImage->mBits, 4, theImage->mWidth * theImage->mHeight, aTGAFile);
+		fwrite(theImage->mBits.get(), 4, theImage->mWidth * theImage->mHeight, aTGAFile);
 	}
 	else
 	{
-		std::vector<uint32_t> aPixelsLE(theImage->mBits, theImage->mBits + theImage->mWidth * theImage->mHeight);
+		std::vector<uint32_t> aPixelsLE(theImage->mBits.get(), theImage->mBits.get() + theImage->mWidth * theImage->mHeight);
 		for (uint32_t& pixel : aPixelsLE)
 			pixel = Sexy::ToLE32(pixel);
 		fwrite(aPixelsLE.data(), 4, aPixelsLE.size(), aTGAFile);
@@ -1010,7 +968,7 @@ typedef struct {
 
 typedef pak_source_mgr * pak_src_ptr;
 
-#define INPUT_BUF_SIZE 4096
+constexpr const int INPUT_BUF_SIZE = 4096;
 
 METHODDEF(void) init_source (j_decompress_ptr cinfo)
 {
@@ -1107,12 +1065,18 @@ Image* GetJPEGImage(const std::string& theFileName)
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
 
+	// must be volatile: assigned after setjmp, read in the error path after longjmp
+	uint32_t* volatile aBits = nullptr;
+	Image* volatile anImage = nullptr;
+
 	if (setjmp(jerr.setjmp_buffer))
 	{
 		/* If we get here, the JPEG code has signaled an error.
 		 * We need to clean up the JPEG object, close the input file, and return.
 		 */
 		jpeg_destroy_decompress(&cinfo);
+		delete[] (uint32_t*)aBits;
+		delete anImage;
 		p_fclose(fp);
 		return 0;
 	}
@@ -1126,7 +1090,7 @@ Image* GetJPEGImage(const std::string& theFileName)
 	unsigned char** buffer = (*cinfo.mem->alloc_sarray)
 		((j_common_ptr) &cinfo, JPOOL_IMAGE, row_stride, 1);
 
-	uint32_t* aBits = new uint32_t[cinfo.output_width*cinfo.output_height];
+	aBits = new uint32_t[cinfo.output_width*cinfo.output_height];
 	uint32_t* q = aBits;
 
 	if (cinfo.output_components==1)
@@ -1161,10 +1125,11 @@ Image* GetJPEGImage(const std::string& theFileName)
 		}
 	}
 
-	Image* anImage = new Image();
+	anImage = new Image();
 	anImage->mWidth = cinfo.output_width;
 	anImage->mHeight = cinfo.output_height;
-	anImage->mBits = aBits;
+	anImage->mBits.reset(aBits);
+	aBits = nullptr; // anImage owns it now; avoid double delete in the error path
 
 	jpeg_finish_decompress(&cinfo);
 	jpeg_destroy_decompress(&cinfo);
@@ -1291,8 +1256,8 @@ static void ComposeAlpha(Image* theImage, Image* theAlphaImage)
 		theImage->mHeight != theAlphaImage->mHeight)
 		return;
 
-	uint32_t* aDstBits = theImage->mBits;
-	const uint32_t* aSrcBits = theAlphaImage->mBits;
+	uint32_t* aDstBits = theImage->mBits.get();
+	const uint32_t* aSrcBits = theAlphaImage->mBits.get();
 	const int aSize = theImage->mWidth * theImage->mHeight;
 
 	for (int i = 0; i < aSize; i++)
@@ -1301,7 +1266,7 @@ static void ComposeAlpha(Image* theImage, Image* theAlphaImage)
 
 static void ApplyAlphaAsImage(Image* theImage, uint32_t theBaseColor)
 {
-	uint32_t* aBits = theImage->mBits;
+	uint32_t* aBits = theImage->mBits.get();
 	const int aSize = theImage->mWidth * theImage->mHeight;
 
 	for (int i = 0; i < aSize; i++)
@@ -1332,7 +1297,7 @@ Image* ImageLib::GetImage(const std::string& theFilename, bool lookForAlphaImage
 	Image* anImage = TryLoadByExt(aFilename, anExt);
 
 	// Probe alpha images with fast existence check
-	Image* anAlphaImage = nullptr;
+	std::unique_ptr<Image> anAlphaImage;
 	if (lookForAlphaImage)
 	{
 		const auto slashEnd = (aLastSlashPos != std::string::npos) ? aLastSlashPos + 1 : 0;
@@ -1340,13 +1305,13 @@ Image* ImageLib::GetImage(const std::string& theFilename, bool lookForAlphaImage
 			theFilename.substr(slashEnd);
 
 		if (FastFileExists(alphaPath1))
-			anAlphaImage = GetImage(alphaPath1, false);
+			anAlphaImage.reset(GetImage(alphaPath1, false));
 
 		if (!anAlphaImage)
 		{
 			const std::string alphaPath2 = theFilename + "_";
 			if (FastFileExists(alphaPath2))
-				anAlphaImage = GetImage(alphaPath2, false);
+				anAlphaImage.reset(GetImage(alphaPath2, false));
 		}
 	}
 
@@ -1355,12 +1320,11 @@ Image* ImageLib::GetImage(const std::string& theFilename, bool lookForAlphaImage
 	{
 		if (anImage)
 		{
-			ComposeAlpha(anImage, anAlphaImage);
-			delete anAlphaImage;
+			ComposeAlpha(anImage, anAlphaImage.get());
 		}
 		else
 		{
-			anImage = anAlphaImage;
+			anImage = anAlphaImage.release();
 			ApplyAlphaAsImage(anImage, static_cast<uint32_t>(gAlphaComposeColor));
 		}
 	}

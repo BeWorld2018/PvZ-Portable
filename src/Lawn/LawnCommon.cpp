@@ -20,6 +20,7 @@
  */
 
 #include <time.h>
+#include <format>
 #include "Board.h"
 #include "Plant.h"
 #include "../LawnApp.h"
@@ -32,12 +33,12 @@
 #include "misc/SexyMatrix.h"
 #include "widget/Checkbox.h"
 
-int gLawnEditWidgetColors[][4] = {
-	{ 0,   0,   0,   0 },
-	{ 0,   0,   0,   0 },
-	{ 240, 240, 255, 255 },
-	{ 255, 255, 255, 255 },
-	{ 0,   0,   0,   255 },
+static constexpr EditWidgetColorScheme gLawnEditWidgetColors{
+	.mBkg = Color(0, 0, 0, 0),
+	.mOutline = Color(0, 0, 0, 0),
+	.mText = Color(240, 240, 255, 255),
+	.mHilite = Color(255, 255, 255, 255),
+	.mHiliteText = Color(0, 0, 0, 255),
 };
 
 // returns whether [theNumber - theRange, theNumber + theRange] contains a multiple of theMod
@@ -135,11 +136,11 @@ void LawnEditWidget::KeyText(std::string_view theText)
 	EditWidget::KeyText(aText);
 }
 
-LawnEditWidget* CreateEditWidget(int theId, EditListener* theListener, Dialog* theDialog)
+std::unique_ptr<LawnEditWidget> CreateEditWidget(int theId, EditListener* theListener, Dialog* theDialog)
 {
-	LawnEditWidget* aEditWidget = new LawnEditWidget(theId, theListener, theDialog);
+	auto aEditWidget = std::make_unique<LawnEditWidget>(theId, theListener, theDialog);
 	aEditWidget->SetFont(Sexy::FONT_BRIANNETOD16);
-	aEditWidget->SetColors(gLawnEditWidgetColors, EditWidget::NUM_COLORS);
+	aEditWidget->SetColors(gLawnEditWidgetColors);
 	aEditWidget->mBlinkDelay = 14;
 
 	return aEditWidget;
@@ -151,9 +152,9 @@ void DrawEditBox(Graphics* g, EditWidget* theWidget)
 	g->DrawImageBox(aDest, IMAGE_EDITBOX);
 }
 
-Checkbox* MakeNewCheckbox(int theId, CheckboxListener* theListener, bool theDefault)
+std::unique_ptr<Checkbox> MakeNewCheckbox(int theId, CheckboxListener* theListener, bool theDefault)
 {
-	Checkbox* aCheckbox = new Checkbox(Sexy::IMAGE_OPTIONS_CHECKBOX0, Sexy::IMAGE_OPTIONS_CHECKBOX1, theId, theListener);
+	auto aCheckbox = std::make_unique<Checkbox>(Sexy::IMAGE_OPTIONS_CHECKBOX0, Sexy::IMAGE_OPTIONS_CHECKBOX1, theId, theListener);
 	aCheckbox->mChecked = theDefault;
 	aCheckbox->mHasAlpha = true;
 	aCheckbox->mHasTransparencies = true;
@@ -163,12 +164,12 @@ Checkbox* MakeNewCheckbox(int theId, CheckboxListener* theListener, bool theDefa
 
 std::string GetSavedGameName(GameMode theGameMode, int theProfileId)
 {
-	return GetAppDataPath(StrFormat("userdata/game%d_%d.v4", theProfileId, static_cast<int>(theGameMode)));
+	return GetAppDataPath(std::format("userdata/game{}_{}.v4", theProfileId, static_cast<int>(theGameMode)));
 }
 
 std::string GetLegacySavedGameName(GameMode theGameMode, int theProfileId)
 {
-	return GetAppDataPath(StrFormat("userdata/game%d_%d.dat", theProfileId, static_cast<int>(theGameMode)));
+	return GetAppDataPath(std::format("userdata/game{}_{}.dat", theProfileId, static_cast<int>(theGameMode)));
 }
 
 int GetCurrentDaysSince2000(time_t theTime)

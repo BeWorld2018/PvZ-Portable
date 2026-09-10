@@ -42,8 +42,9 @@ HyperlinkWidget::HyperlinkWidget(int theId, ButtonListener* theButtonListener) :
 
 void HyperlinkWidget::Draw(Graphics* g)
 {
-	if ((mFont == nullptr) && (mWidgetManager->mApp->mDefaultFont != nullptr))
-		mFont = mWidgetManager->mApp->mDefaultFont->Duplicate();
+	_Font* aDefaultFont = mWidgetManager->mApp->mDefaultFont.load();
+	if ((mFont == nullptr) && (aDefaultFont != nullptr))
+		mFont.reset(aDefaultFont->Duplicate());
 	if (mFont == nullptr)
 		return;
 
@@ -55,7 +56,7 @@ void HyperlinkWidget::Draw(Graphics* g)
 	else
 		g->SetColor(mColor);
 
-	g->SetFont(mFont);
+	g->SetFont(mFont.get());
 	g->DrawString(mLabel, aFontX, aFontY);
 
 	for (int i = 0; i < mUnderlineSize; i++)

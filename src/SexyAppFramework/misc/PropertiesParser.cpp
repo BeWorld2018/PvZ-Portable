@@ -25,6 +25,7 @@
 #include "PropertiesParser.h"
 #include "XMLParser.h"
 #include <stdlib.h>
+#include <format>
 
 using namespace Sexy;
 
@@ -32,7 +33,6 @@ PropertiesParser::PropertiesParser(SexyAppBase* theApp)
 {
 	mApp = theApp;
 	mHasFailed = false;
-	mXMLParser = nullptr;
 }
 
 void PropertiesParser::Fail(const std::string& theErrorText)
@@ -43,8 +43,8 @@ void PropertiesParser::Fail(const std::string& theErrorText)
 		int aLineNum = mXMLParser->GetCurrentLineNum();
 
 		mError = theErrorText;
-		if (aLineNum > 0) mError += StrFormat(" on Line %d", aLineNum);
-		if (!mXMLParser->GetFileName().empty()) mError += StrFormat(" in File '%s'", mXMLParser->GetFileName().c_str());
+		if (aLineNum > 0) mError += std::format(" on Line {}", aLineNum);
+		if (!mXMLParser->GetFileName().empty()) mError += std::format(" in File '{}'", mXMLParser->GetFileName());
 	}
 }
 
@@ -262,15 +262,14 @@ bool PropertiesParser::DoParseProperties()
 	if (mXMLParser->HasFailed())
 		Fail(mXMLParser->GetErrorText());
 
-	delete mXMLParser;
-	mXMLParser = nullptr;
+	mXMLParser.reset();
 
 	return !mHasFailed;
 }
 
 bool PropertiesParser::ParsePropertiesBuffer(const Buffer& theBuffer)
 {
-	mXMLParser = new XMLParser();
+	mXMLParser = std::make_unique<XMLParser>();
 
 	std::string aString;
 	if (!theBuffer.ToUTF8String(&aString))
@@ -285,7 +284,7 @@ bool PropertiesParser::ParsePropertiesBuffer(const Buffer& theBuffer)
 
 bool PropertiesParser::ParsePropertiesFile(const std::string& theFilename)
 {
-	mXMLParser = new XMLParser();
+	mXMLParser = std::make_unique<XMLParser>();
 	mXMLParser->OpenFile(theFilename);
 	return DoParseProperties();
 }

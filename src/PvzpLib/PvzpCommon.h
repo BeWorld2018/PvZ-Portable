@@ -21,11 +21,11 @@
 
 #pragma once
 #include <cstdint>
-#include <cstdarg>
 #include <stdlib.h>
 #include <cmath>
 #include <cfloat>
 #include "../ConstEnums.h"  // PvzpCurves, DrawStringJustification
+#include "../GameConstants.h"
 #include "../SexyAppFramework/Common.h"
 #include "PvzpDebug.h"
 #include "misc/ResourceManager.h"
@@ -42,9 +42,9 @@ namespace Sexy
 //using namespace std;
 using namespace Sexy;
 
-#define RENDERIMAGEFLAG_SANDING 0x1000
-#define DEG_TO_RAD(deg) ((deg) * 0.017453292f)
-#define RAD_TO_DEG(rad) ((rad) * 57.29578f)
+constexpr const int RENDERIMAGEFLAG_SANDING = 0x1000;
+template <typename T> constexpr float DEG_TO_RAD(T deg) { return deg * 0.017453292f; }
+template <typename T> constexpr float RAD_TO_DEG(T rad) { return rad * 57.29578f; }
 
 struct PvzpWeightedArray
 {
@@ -114,7 +114,28 @@ float					PvzpCurveInvPoly(float theTime, float thePoly);
 float					PvzpCurvePolyS(float theTime, float thePoly);
 float					PvzpCurveCircle(float theTime);
 float					PvzpCurveInvCircle(float theTime);
-float					PvzpCurveEvaluate(float theTime, float thePositionStart, float thePositionEnd, PvzpCurves theCurve);
+inline float PvzpCurveEvaluate(float theTime, float thePositionStart, float thePositionEnd, PvzpCurves theCurve)
+{
+	float aWarpedTime = 0;
+	switch (theCurve)
+	{
+	case PvzpCurves::CURVE_CONSTANT:				aWarpedTime = 0;													break;
+	case PvzpCurves::CURVE_LINEAR:				aWarpedTime = theTime;												break;
+	case PvzpCurves::CURVE_EASE_IN:				aWarpedTime = PvzpCurveQuad(theTime);								break;
+	case PvzpCurves::CURVE_EASE_OUT:				aWarpedTime = PvzpCurveInvQuad(theTime);								break;
+	case PvzpCurves::CURVE_EASE_IN_OUT:			aWarpedTime = PvzpCurveS(PvzpCurveS(theTime));						break;
+	case PvzpCurves::CURVE_EASE_IN_OUT_WEAK:		aWarpedTime = PvzpCurveS(theTime);									break;
+	case PvzpCurves::CURVE_FAST_IN_OUT:			aWarpedTime = PvzpCurveInvQuadS(PvzpCurveInvQuadS(theTime));			break;
+	case PvzpCurves::CURVE_FAST_IN_OUT_WEAK:		aWarpedTime = PvzpCurveInvQuadS(theTime);							break;
+	case PvzpCurves::CURVE_BOUNCE:				aWarpedTime = PvzpCurveBounce(theTime);								break;
+	case PvzpCurves::CURVE_BOUNCE_FAST_MIDDLE:	aWarpedTime = PvzpCurveQuad(PvzpCurveBounce(theTime));				break;
+	case PvzpCurves::CURVE_BOUNCE_SLOW_MIDDLE:	aWarpedTime = PvzpCurveInvQuad(PvzpCurveBounce(theTime));				break;
+	case PvzpCurves::CURVE_SIN_WAVE:				aWarpedTime = sinf(2 * PI * theTime);								break;
+	case PvzpCurves::CURVE_EASE_SIN_WAVE:		aWarpedTime = sinf(2 * PI * PvzpCurveS(theTime));					break;
+	default:									PVZP_ASSERT(false);														break;
+	}
+	return (thePositionEnd - thePositionStart) * aWarpedTime + thePositionStart;
+}
 float					PvzpCurveEvaluateClamped(float theTime, float thePositionStart, float thePositionEnd, PvzpCurves theCurve);
 float					PvzpAnimateCurveFloatTime(float theTimeStart, float theTimeEnd, float theTimeAge, float thePositionStart, float thePositionEnd, PvzpCurves theCurve);
 float					PvzpAnimateCurveFloat(int theTimeStart, int theTimeEnd, int theTimeAge, float thePositionStart, float thePositionEnd, PvzpCurves theCurve);
@@ -146,8 +167,6 @@ void					Pvzp_SWTri_AddAllDrawTriFuncs();
 
 std::string				PvzpReplaceString(std::string_view theText, const char* theStringToFind, std::string_view theStringToSubstitute);
 std::string				PvzpReplaceNumberString(std::string_view theText, const char* theStringToFind, int theNumber);
-int						PvzpSnprintf(char* theBuffer, int theSize, const char* theFormat, ...);
-int						PvzpVsnprintf(char* theBuffer, int theSize, const char* theFormat, va_list theArgList);
 
 PvzpAllocator*			FindGlobalAllocator(int theSize);
 void                    FreeGlobalAllocators();

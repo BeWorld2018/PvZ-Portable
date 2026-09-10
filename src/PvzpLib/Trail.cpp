@@ -22,11 +22,12 @@
 #include "Trail.h"
 #include "Definition.h"
 #include <algorithm>
+#include <format>
 #include "graphics/Graphics.h"
 #include "graphics/TriVertex.h"
 
 int gTrailDefCount;
-TrailDefinition* gTrailDefArray;
+std::unique_ptr<TrailDefinition[]> gTrailDefArray;
 int gTrailParamArraySize;
 TrailParams* gTrailParamArray;
 
@@ -40,7 +41,7 @@ TrailPoint::TrailPoint()
 
 bool TrailLoadADef(TrailDefinition* theTrailDef, const char* theTrailFileName)
 {
-	PvzpHesitationBracket aHesitation("Load Trail '%s'", theTrailFileName);
+	PvzpHesitationBracket aHesitation("Load Trail '{}'", theTrailFileName);
 
 	if (!DefinitionLoadXML(theTrailFileName, &gTrailDefMap, theTrailDef))
 		return false;
@@ -61,7 +62,7 @@ void TrailLoadDefinitions(TrailParams* theTrailParamArray, int theTrailParamArra
 	gTrailParamArraySize = theTrailParamArraySize;
 	gTrailParamArray = theTrailParamArray;
 	gTrailDefCount = theTrailParamArraySize;
-	gTrailDefArray = new TrailDefinition[theTrailParamArraySize]();
+	gTrailDefArray = std::make_unique<TrailDefinition[]>(theTrailParamArraySize);
 
 	for (int i = 0; i < gTrailParamArraySize; i++)
 	{
@@ -69,9 +70,7 @@ void TrailLoadDefinitions(TrailParams* theTrailParamArray, int theTrailParamArra
 		PVZP_ASSERT(aTrailParams->mTrailType == static_cast<TrailType>(i));
 		if (!TrailLoadADef(&gTrailDefArray[i], aTrailParams->mTrailFileName))
 		{
-			char aBuf[512];
-			snprintf(aBuf, sizeof(aBuf), "Failed to load trail '%s'", aTrailParams->mTrailFileName);
-			PvzpErrorMessageBox(aBuf, "Error");
+			PvzpErrorMessageBox(std::format("Failed to load trail '{}'", aTrailParams->mTrailFileName), "Error");
 		}
 	}
 }
@@ -80,8 +79,7 @@ void TrailFreeDefinitions()
 {
 	for (int i = 0; i < gTrailDefCount; i++)
 		DefinitionFreeMap(&gTrailDefMap, &gTrailDefArray[i]);
-	delete[] gTrailDefArray;
-	gTrailDefArray = nullptr;
+	gTrailDefArray.reset();
 	gTrailDefCount = 0;
 	gTrailParamArray = nullptr;
 	gTrailParamArraySize = 0;
@@ -213,13 +211,11 @@ void Trail::Draw(Graphics* g)
 		float aWidthOverLengthCur = FloatTrackEvaluate(mDefinition->mWidthOverLength, aUCur, mTrailInterp[TrailTracks::TRACK_WIDTH_OVER_LENGTH]);
 		float aWidthOverLengthNext = FloatTrackEvaluate(mDefinition->mWidthOverLength, aUNext, mTrailInterp[TrailTracks::TRACK_WIDTH_OVER_LENGTH]);
 		float aWidthOverTimeCur = FloatTrackEvaluate(mDefinition->mWidthOverTime, aTimeValue, mTrailInterp[TrailTracks::TRACK_WIDTH_OVER_TIME]);
-		float aWidthOverTimeNext = FloatTrackEvaluate(mDefinition->mWidthOverTime, aTimeValue, mTrailInterp[TrailTracks::TRACK_WIDTH_OVER_TIME]);
 		float aAlphaOverLengthCur = FloatTrackEvaluate(mDefinition->mAlphaOverLength, aUCur, mTrailInterp[TrailTracks::TRACK_ALPHA_OVER_LENGTH]);
 		float aAlphaOverLengthNext = FloatTrackEvaluate(mDefinition->mAlphaOverLength, aUNext, mTrailInterp[TrailTracks::TRACK_ALPHA_OVER_LENGTH]);
 		float aAlphaOverTimeCur = FloatTrackEvaluate(mDefinition->mAlphaOverTime, aTimeValue, mTrailInterp[TrailTracks::TRACK_ALPHA_OVER_TIME]);
-		float aAlphaOverTimeNext = FloatTrackEvaluate(mDefinition->mAlphaOverTime, aTimeValue, mTrailInterp[TrailTracks::TRACK_ALPHA_OVER_TIME]);
 		int anAlphaCur = std::clamp(FloatRoundToInt(aAlphaOverLengthCur * aAlphaOverTimeCur * mColorOverride.mAlpha), 0, 255);
-		int anAlphaNext = std::clamp(FloatRoundToInt(aAlphaOverLengthNext * aAlphaOverTimeNext * mColorOverride.mAlpha), 0, 255);
+		int anAlphaNext = std::clamp(FloatRoundToInt(aAlphaOverLengthNext * aAlphaOverTimeCur * mColorOverride.mAlpha), 0, 255);
 		Sexy::Color aColorCur = mColorOverride;
 		Sexy::Color aColorNext = mColorOverride;
 		aColorCur.mAlpha = anAlphaCur;
@@ -230,10 +226,10 @@ void Trail::Draw(Graphics* g)
 		aPosition[0].y = mTrailCenter.y + aPointCur.aPos.y + aNormalCur.y * aWidthOverLengthCur * aWidthOverTimeCur;
 		aPosition[1].x = mTrailCenter.x + aPointCur.aPos.x + -aNormalCur.x * aWidthOverLengthCur * aWidthOverTimeCur;
 		aPosition[1].y = mTrailCenter.y + aPointCur.aPos.y + -aNormalCur.y * aWidthOverLengthCur * aWidthOverTimeCur;
-		aPosition[2].x = mTrailCenter.x + aPointNext.aPos.x + aNormalNext.x * aWidthOverLengthNext * aWidthOverTimeNext;
-		aPosition[2].y = mTrailCenter.y + aPointNext.aPos.y + aNormalNext.y * aWidthOverLengthNext * aWidthOverTimeNext;
-		aPosition[3].x = mTrailCenter.x + aPointNext.aPos.x + -aNormalNext.x * aWidthOverLengthNext * aWidthOverTimeNext;
-		aPosition[3].y = mTrailCenter.y + aPointNext.aPos.y + -aNormalNext.y * aWidthOverLengthNext * aWidthOverTimeNext;
+		aPosition[2].x = mTrailCenter.x + aPointNext.aPos.x + aNormalNext.x * aWidthOverLengthNext * aWidthOverTimeCur;
+		aPosition[2].y = mTrailCenter.y + aPointNext.aPos.y + aNormalNext.y * aWidthOverLengthNext * aWidthOverTimeCur;
+		aPosition[3].x = mTrailCenter.x + aPointNext.aPos.x + -aNormalNext.x * aWidthOverLengthNext * aWidthOverTimeCur;
+		aPosition[3].y = mTrailCenter.y + aPointNext.aPos.y + -aNormalNext.y * aWidthOverLengthNext * aWidthOverTimeCur;
 
 		int aVertCur = i * 2;
 		int aVertNext = aVertCur + 1;
@@ -288,9 +284,8 @@ Trail* TrailHolder::AllocTrail(int theRenderOrder, TrailType theTrailType)
 	return AllocTrailFromDef(theRenderOrder, &gTrailDefArray[theTrailType]);
 }
 
-Trail* TrailHolder::AllocTrailFromDef(int theRenderOrder, TrailDefinition* theDefinition)
+Trail* TrailHolder::AllocTrailFromDef([[maybe_unused]] int theRenderOrder, TrailDefinition* theDefinition)
 {
-	(void)theRenderOrder;
 	if (mTrails.mSize == mTrails.mMaxSize)
 		return nullptr;
 

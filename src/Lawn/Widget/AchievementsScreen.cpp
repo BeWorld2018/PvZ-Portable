@@ -184,12 +184,11 @@ void AchievementsWidget::KeyDown(KeyCode theKey) {
 	}
 	else if (theKey == KEYCODE_ESCAPE) {
 		mApp->mGameSelector->SlideTo(0, 0);
-		mApp->mGameSelector->mWidgetManager->SetFocus(mApp->mGameSelector);
+		mApp->mGameSelector->mWidgetManager->SetFocus(mApp->mGameSelector.get());
 	}
 }
 
-void AchievementsWidget::MouseDown(int x, int y, int theClickCount) {
-	(void)theClickCount;
+void AchievementsWidget::MouseDown(int x, int y, [[maybe_unused]] int theClickCount) {
 	if (aBackButtonRect.Contains(x, y))
 		mApp->PlaySample(SOUND_GRAVEBUTTON);
 
@@ -197,11 +196,11 @@ void AchievementsWidget::MouseDown(int x, int y, int theClickCount) {
 		mApp->PlaySample(SOUND_GRAVEBUTTON);
 }
 
-void AchievementsWidget::MouseUp(int x, int y, int theClickCount) {
+void AchievementsWidget::MouseUp(int x, int y, [[maybe_unused]] int theClickCount) {
 	Point aPos = Point(x, y);
 	if (aBackButtonRect.Contains(aPos)) {
 		mApp->mGameSelector->SlideTo(0, 0);
-		mApp->mGameSelector->mWidgetManager->SetFocus(mApp->mGameSelector);
+		mApp->mGameSelector->mWidgetManager->SetFocus(mApp->mGameSelector.get());
 	}
 
 	if (mMoreRockRect.Contains(aPos)) {
@@ -209,8 +208,6 @@ void AchievementsWidget::MouseUp(int x, int y, int theClickCount) {
 		mScrollDirection = mDidPressMoreButton ? -1 : 1;
 		mScrollValue = 20;
 	}
-
-	(void)theClickCount;
 }
 
 void AchievementsWidget::MouseWheel(int theDelta) {
@@ -235,8 +232,7 @@ void ReportAchievement::GiveAchievement(LawnApp* theApp, int theAchievement, boo
 		return;
 
 	std::string aAchievementName = theApp->GetString(gAchievementList[theAchievement].name, gAchievementList[theAchievement].name);
-	std::string aFormat = theApp->GetString("%s Achievement!", "%s Achievement!");
-	std::string aMessage = Sexy::StrFormat(aFormat.c_str(), aAchievementName.c_str());
+	std::string aMessage = theApp->GetFormattedString("%s Achievement!", "%s Achievement!", aAchievementName.c_str());
 
 	if (theApp->mBoard) {
 		theApp->mBoard->DisplayAdvice(aMessage, MESSAGE_STYLE_ACHIEVEMENT, AdviceType::ADVICE_NONE);

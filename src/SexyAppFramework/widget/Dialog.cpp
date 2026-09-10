@@ -40,15 +40,15 @@ std::string Sexy::DIALOG_NO_STRING				= "NO";
 std::string Sexy::DIALOG_OK_STRING				= "OK";
 std::string Sexy::DIALOG_CANCEL_STRING			= "CANCEL";
 
-static int gDialogColors[][3] =
-{{255, 255, 255},
-{255, 255, 0},
-{255, 255, 255},
-{255, 255, 255},
-{255, 255, 255},
-
-{80, 80, 80},
-{255, 255, 255}};
+static constexpr DialogColorScheme gDefaultDialogColors{
+	.mHeader = Color(255, 255, 255),
+	.mLines = Color(255, 255, 0),
+	.mFooter = Color(255, 255, 255),
+	.mButtonText = Color(255, 255, 255),
+	.mButtonTextHilite = Color(255, 255, 255),
+	.mBkg = Color(80, 80, 80),
+	.mOutline = Color(255, 255, 255),
+};
 
 Dialog::Dialog(Image* theComponentImage, Image* theButtonComponentImage, int theId, bool isModal, const std::string& theDialogHeader, const std::string& theDialogLines, const std::string& theDialogFooter, int theButtonMode)
 {
@@ -70,8 +70,8 @@ Dialog::Dialog(Image* theComponentImage, Image* theButtonComponentImage, int the
 
 	if ((mButtonMode == BUTTONS_YES_NO) || (mButtonMode == BUTTONS_OK_CANCEL))
 	{
-		mYesButton = new DialogButton(theButtonComponentImage, ID_YES, this);
-		mNoButton = new DialogButton(theButtonComponentImage, ID_NO, this);
+		mYesButton = std::make_unique<DialogButton>(theButtonComponentImage, ID_YES, this);
+		mNoButton = std::make_unique<DialogButton>(theButtonComponentImage, ID_NO, this);
 
 		if (mButtonMode == BUTTONS_YES_NO)
 		{
@@ -86,14 +86,11 @@ Dialog::Dialog(Image* theComponentImage, Image* theButtonComponentImage, int the
 	}
 	else if (mButtonMode == BUTTONS_FOOTER)
 	{
-		mYesButton = new DialogButton(theButtonComponentImage, ID_FOOTER, this);
+		mYesButton = std::make_unique<DialogButton>(theButtonComponentImage, ID_FOOTER, this);
 		mYesButton->mLabel = mDialogFooter;
-		mNoButton = nullptr;
 	}
 	else
 	{
-		mYesButton = nullptr;
-		mNoButton = nullptr;
 		mNumButtons = 0;
 	}
 
@@ -104,53 +101,71 @@ Dialog::Dialog(Image* theComponentImage, Image* theButtonComponentImage, int the
 	mHasTransparencies = true;
 	mHasAlpha = true;
 
-	mHeaderFont = nullptr;
-	mLinesFont = nullptr;
-
 	mDragging = false;
 	mPriority = 1;
 
+	DialogColorScheme aColors = gDefaultDialogColors;
 	if (theButtonComponentImage == nullptr)
 	{
-		gDialogColors[COLOR_BUTTON_TEXT][0] = 0;
-		gDialogColors[COLOR_BUTTON_TEXT][1] = 0;
-		gDialogColors[COLOR_BUTTON_TEXT][2] = 0;
-		gDialogColors[COLOR_BUTTON_TEXT_HILITE][0] = 0;
-		gDialogColors[COLOR_BUTTON_TEXT_HILITE][1] = 0;
-		gDialogColors[COLOR_BUTTON_TEXT_HILITE][2] = 0;
+		aColors.mButtonText = Color(0, 0, 0);
+		aColors.mButtonTextHilite = Color(0, 0, 0);
 	}
 
-	SetColors(gDialogColors, NUM_COLORS);
+	SetColors(aColors);
 }
 
 
-Dialog::~Dialog()
-{
-	delete mYesButton;
-	delete mNoButton;
+Dialog::~Dialog() = default;
 
-	delete mHeaderFont;
-	delete mLinesFont;
+void Dialog::SetColors(const DialogColorScheme& theColors)
+{
+	mColors = theColors;
+	MarkDirty();
+
+	if (mYesButton != nullptr)
+	{
+		mYesButton->SetLabelColor(mColors.mButtonText);
+		mYesButton->SetLabelHiliteColor(mColors.mButtonTextHilite);
+	}
+	if (mNoButton != nullptr)
+	{
+		mNoButton->SetLabelColor(mColors.mButtonText);
+		mNoButton->SetLabelHiliteColor(mColors.mButtonTextHilite);
+	}
 }
 
-void Dialog::SetColor(int theIdx, const Color& theColor)
+void Dialog::SetHeaderColor(const Color& theColor)
 {
-	Widget::SetColor(theIdx, theColor);
+	mColors.mHeader = theColor;
+	MarkDirty();
+}
 
-	if (theIdx == COLOR_BUTTON_TEXT)
-	{
-		if (mYesButton != nullptr)
-			mYesButton->SetColor(DialogButton::COLOR_LABEL, theColor);
-		if (mNoButton != nullptr)
-			mNoButton->SetColor(DialogButton::COLOR_LABEL, theColor);
-	}
-	else if (theIdx == COLOR_BUTTON_TEXT_HILITE)
-	{
-		if (mYesButton != nullptr)
-			mYesButton->SetColor(DialogButton::COLOR_LABEL_HILITE, theColor);
-		if (mNoButton != nullptr)
-			mNoButton->SetColor(DialogButton::COLOR_LABEL_HILITE, theColor);
-	}
+void Dialog::SetLinesColor(const Color& theColor)
+{
+	mColors.mLines = theColor;
+	MarkDirty();
+}
+
+void Dialog::SetButtonTextColor(const Color& theColor)
+{
+	mColors.mButtonText = theColor;
+	MarkDirty();
+
+	if (mYesButton != nullptr)
+		mYesButton->SetLabelColor(theColor);
+	if (mNoButton != nullptr)
+		mNoButton->SetLabelColor(theColor);
+}
+
+void Dialog::SetButtonTextHiliteColor(const Color& theColor)
+{
+	mColors.mButtonTextHilite = theColor;
+	MarkDirty();
+
+	if (mYesButton != nullptr)
+		mYesButton->SetLabelHiliteColor(theColor);
+	if (mNoButton != nullptr)
+		mNoButton->SetLabelHiliteColor(theColor);
 }
 
 void Dialog::SetButtonFont(_Font* theFont)
@@ -164,22 +179,20 @@ void Dialog::SetButtonFont(_Font* theFont)
 
 void Dialog::SetHeaderFont(_Font* theFont)
 {
-	delete mHeaderFont;
-	mHeaderFont = theFont->Duplicate();
+	mHeaderFont.reset(theFont->Duplicate());
 }
 
 void Dialog::SetLinesFont(_Font* theFont)
 {
-	delete mLinesFont;
-	mLinesFont = theFont->Duplicate();
+	mLinesFont.reset(theFont->Duplicate());
 }
 
 void Dialog::EnsureFonts()
 {
 	if (mHeaderFont == nullptr)
-		mHeaderFont = gSexyAppBase->mDefaultFont->Duplicate();
+		mHeaderFont.reset(gSexyAppBase->mDefaultFont.load()->Duplicate());
 	if (mLinesFont == nullptr)
-		mLinesFont = gSexyAppBase->mDefaultFont->Duplicate();
+		mLinesFont.reset(gSexyAppBase->mDefaultFont.load()->Duplicate());
 }
 
 int	Dialog::GetPreferredHeight(int theWidth)
@@ -200,7 +213,7 @@ int	Dialog::GetPreferredHeight(int theWidth)
 		if (needSpace)
 			aHeight += mSpaceAfterHeader;
 		Graphics g;
-		g.SetFont(mLinesFont);
+		g.SetFont(mLinesFont.get());
 		aHeight += GetWordWrappedHeight(&g, theWidth-mContentInsets.mLeft-mContentInsets.mRight-mBackgroundInsets.mLeft-mBackgroundInsets.mRight-4, mDialogLines, mLinesFont->GetLineSpacing() + mLineSpacingOffset);
 		needSpace = true;
 	}
@@ -234,9 +247,9 @@ void Dialog::Draw(Graphics* g)
 	}
 	else
 	{
-		g->SetColor(GetColor(COLOR_OUTLINE, Color(gDialogColors[COLOR_OUTLINE])));
+		g->SetColor(mColors.mOutline);
 		g->DrawRect(12, 12, mWidth - 12*2 - 1, mHeight - 12*2 - 1);
-		g->SetColor(GetColor(COLOR_BKG, Color(gDialogColors[COLOR_BKG])));
+		g->SetColor(mColors.mBkg);
 		g->FillRect(12+1, 12+1, mWidth - 12*2 - 2, mHeight - 12*2 - 2);
 
 		g->SetColor(Color(0, 0, 0, 128));
@@ -250,8 +263,8 @@ void Dialog::Draw(Graphics* g)
 	{
 		aCurY += mHeaderFont->GetAscent() - mHeaderFont->GetAscentPadding();
 
-		g->SetFont(mHeaderFont);
-		g->SetColor(mColors[COLOR_HEADER]);
+		g->SetFont(mHeaderFont.get());
+		g->SetColor(mColors.mHeader);
 		WriteCenteredLine(g, aCurY, mDialogHeader);
 
 		aCurY += mHeaderFont->GetHeight() - mHeaderFont->GetAscent();
@@ -259,8 +272,8 @@ void Dialog::Draw(Graphics* g)
 		aCurY += mSpaceAfterHeader;
 	}
 
-	g->SetFont(mLinesFont);
-	g->SetColor(mColors[COLOR_LINES]);
+	g->SetFont(mLinesFont.get());
+	g->SetColor(mColors.mLines);
 
 	Rect aRect(mBackgroundInsets.mLeft+mContentInsets.mLeft+2, aCurY, mWidth-mContentInsets.mLeft-mContentInsets.mRight-mBackgroundInsets.mLeft-mBackgroundInsets.mRight-4, 0);
 	aCurY += WriteWordWrapped(g, aRect, mDialogLines, mLinesFont->GetLineSpacing() + mLineSpacingOffset, mTextAlign);
@@ -270,8 +283,8 @@ void Dialog::Draw(Graphics* g)
 		aCurY += 8;
 		aCurY += mHeaderFont->GetLineSpacing();
 
-		g->SetFont(mHeaderFont);
-		g->SetColor(mColors[COLOR_FOOTER]);
+		g->SetFont(mHeaderFont.get());
+		g->SetColor(mColors.mFooter);
 		WriteCenteredLine(g, aCurY, mDialogFooter);
 	}
 }
@@ -281,9 +294,9 @@ void Dialog::AddedToManager(WidgetManager* theWidgetManager)
 	Widget::AddedToManager(theWidgetManager);
 
 	if (mYesButton != nullptr)
-		theWidgetManager->AddWidget(mYesButton);
+		theWidgetManager->AddWidget(mYesButton.get());
 	if (mNoButton != nullptr)
-		theWidgetManager->AddWidget(mNoButton);
+		theWidgetManager->AddWidget(mNoButton.get());
 }
 
 void Dialog::RemovedFromManager(WidgetManager* theWidgetManager)
@@ -291,18 +304,18 @@ void Dialog::RemovedFromManager(WidgetManager* theWidgetManager)
 	Widget::RemovedFromManager(theWidgetManager);
 
 	if (mYesButton != nullptr)
-		theWidgetManager->RemoveWidget(mYesButton);
+		theWidgetManager->RemoveWidget(mYesButton.get());
 	if (mNoButton != nullptr)
-		theWidgetManager->RemoveWidget(mNoButton);
+		theWidgetManager->RemoveWidget(mNoButton.get());
 }
 
 void Dialog::OrderInManagerChanged()
 {
 	Widget::OrderInManagerChanged();
 	if (mYesButton != nullptr)
-		mWidgetManager->PutInfront(mYesButton,this);
+		mWidgetManager->PutInfront(mYesButton.get(),this);
 	if (mNoButton != nullptr)
-		mWidgetManager->PutInfront(mNoButton,this);
+		mWidgetManager->PutInfront(mNoButton.get(),this);
 }
 
 void Dialog::Resize(int theX, int theY, int theWidth, int theHeight)

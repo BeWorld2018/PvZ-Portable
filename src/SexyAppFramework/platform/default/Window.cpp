@@ -24,6 +24,9 @@
 
 #include <SDL.h>
 
+#include <memory>
+#include <type_traits>
+
 #include "SexyAppBase.h"
 #include "graphics/GLInterface.h"
 #include "graphics/GLImage.h"
@@ -57,56 +60,59 @@ void SexyAppBase::MakeWindow()
 			| (!mIsWindowed ? SDL_WINDOW_FULLSCREEN : 0);
 
 #ifndef __MORPHOS__
+		using WindowPtr = std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)>;
+		using GLContextPtr = std::unique_ptr<std::remove_pointer_t<SDL_GLContext>, decltype(&SDL_GL_DeleteContext)>;
+#endif
+
 		// Try OpenGL ES 2.0 first (Linux, most Windows drivers, ANGLE, etc.)
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #endif
 
-		mWindow = (void*)SDL_CreateWindow(
+		WindowPtr window(SDL_CreateWindow(
 			mTitle.c_str(),
 			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-			mWidth, mHeight, winFlags);
+			mWidth, mHeight, winFlags), &SDL_DestroyWindow);
+		GLContextPtr context(nullptr, &SDL_GL_DeleteContext);
 
-		if (mWindow)
-			mContext = (void*)SDL_GL_CreateContext((SDL_Window*)mWindow);
+		if (window)
+			context.reset(SDL_GL_CreateContext(window.get()));
 
 #if defined(__ANDROID__) || defined(__IPHONEOS__)
 		// EGL/EAGL surface may be transiently unavailable on mobile
-		for (int retry = 0; !mContext && mWindow && retry < 20; retry++)
+		for (int retry = 0; !context && window && retry < 20; retry++)
 		{
 			SDL_Delay(100);
 			SDL_PumpEvents();
-			mContext = (void*)SDL_GL_CreateContext((SDL_Window*)mWindow);
+			context.reset(SDL_GL_CreateContext(window.get()));
 		}
-		if (!mContext)
+		if (!context)
 		{
-			if (mWindow) { SDL_DestroyWindow((SDL_Window*)mWindow); mWindow = nullptr; }
-			Sexy::LogError("Failed to create OpenGL ES context.");
+			Sexy::LogErrorLn("Failed to create OpenGL ES context.");
 			return;
 		}
 #else
 		// Fallback: desktop GL 2.1 compatibility (macOS, old Windows drivers, etc.)
-		if (!mContext)
+		if (!context)
 		{
-			if (mWindow) { SDL_DestroyWindow((SDL_Window*)mWindow); mWindow = nullptr; }
+			window.reset();
 
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 
-			mWindow = (void*)SDL_CreateWindow(
+			window.reset(SDL_CreateWindow(
 				mTitle.c_str(),
 				SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-				mWidth, mHeight, winFlags);
+				mWidth, mHeight, winFlags));
 
-			if (mWindow)
-				mContext = (void*)SDL_GL_CreateContext((SDL_Window*)mWindow);
+			if (window)
+				context.reset(SDL_GL_CreateContext(window.get()));
 
-			if (!mContext)
+			if (!context)
 			{
-				if (mWindow) { SDL_DestroyWindow((SDL_Window*)mWindow); mWindow = nullptr; }
-				Sexy::LogError("Failed to create any OpenGL context. "
+				Sexy::LogErrorLn("Failed to create any OpenGL context. "
 					"Please check your graphics drivers.");
 				return;
 			}
@@ -124,14 +130,16 @@ void SexyAppBase::MakeWindow()
 		SDL_GL_SwapWindow((SDL_Window*)mWindow);
 #endif
 		SDL_GL_SetSwapInterval(1);
+
+		mWindow = (void*)window.release();
+		mContext = (void*)context.release();
 	}
 
 	if (mGLInterface == nullptr)
 	{
-		mGLInterface = new GLInterface(this);
+		mGLInterface = std::make_unique<GLInterface>(this);
 		if (!InitGLInterface())
 		{
-			delete mGLInterface;
 			mGLInterface = nullptr;
 			return;
 		}

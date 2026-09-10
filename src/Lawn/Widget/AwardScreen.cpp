@@ -134,41 +134,41 @@ AwardScreen::AwardScreen(LawnApp* theApp, AwardType theAwardType, bool theShowin
 	for (std::string& resource : mLoadedResourceNames)
 		PvzpLoadResources(resource.c_str());
 
-	mStartButton = new GameButton(AwardScreen::AwardScreen_Start);
+	mStartButton = std::make_unique<GameButton>(AwardScreen::AwardScreen_Start);
 	mStartButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
 	mStartButton->mOverImage = nullptr;
 	mStartButton->mDownImage = nullptr;
 	mStartButton->mDisabledImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED;
 	mStartButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
 	mStartButton->SetFont(Sexy::FONT_DWARVENTODCRAFT15);
-	mStartButton->mColors[ButtonWidget::COLOR_LABEL] = Color(213, 159, 43);
-	mStartButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(213, 159, 43);
+	mStartButton->SetLabelColor(Color(213, 159, 43));
+	mStartButton->SetLabelHiliteColor(Color(213, 159, 43));
 	mStartButton->Resize(324, 500, 156, 42);
 	mStartButton->mTextOffsetY = -1;
 
-	mContinueButton = new GameButton(AwardScreen::AwardScreen_Start);
+	mContinueButton = std::make_unique<GameButton>(AwardScreen::AwardScreen_Start);
 	mContinueButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
 	mContinueButton->mOverImage = nullptr;
 	mContinueButton->mDownImage = nullptr;
 	mContinueButton->mDisabledImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED;
 	mContinueButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
 	mContinueButton->SetFont(Sexy::FONT_DWARVENTODCRAFT15);
-	mContinueButton->mColors[ButtonWidget::COLOR_LABEL] = Color(213, 159, 43);
-	mContinueButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(213, 159, 43);
+	mContinueButton->SetLabelColor(Color(213, 159, 43));
+	mContinueButton->SetLabelHiliteColor(Color(213, 159, 43));
 	mContinueButton->Resize(324, 515, 156, 42);
 	mContinueButton->mParentWidget = this;
 	mContinueButton->mTextOffsetY = -1;
 	mContinueButton->mBtnNoDraw = true;
 	mContinueButton->mDisabled = true;
 
-	mMenuButton = new GameButton(AwardScreen::AwardScreen_Menu);
+	mMenuButton = std::make_unique<GameButton>(AwardScreen::AwardScreen_Menu);
 	mMenuButton->SetLabel("[AWARD_MAIN_MENU_BUTTON]");
 	mMenuButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2;
 	mMenuButton->mOverImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2_GLOW;
 	mMenuButton->mDownImage = nullptr;
 	mMenuButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mMenuButton->mColors[ButtonWidget::COLOR_LABEL] = Color(42, 42, 90);
-	mMenuButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(42, 42, 90);
+	mMenuButton->SetLabelColor(Color(42, 42, 90));
+	mMenuButton->SetLabelHiliteColor(Color(42, 42, 90));
 	mMenuButton->mParentWidget = this;
 	mMenuButton->Resize(677, 16, 111, 26);
 	mMenuButton->mTextOffsetY = 1;
@@ -187,8 +187,8 @@ AwardScreen::AwardScreen(LawnApp* theApp, AwardType theAwardType, bool theShowin
 		mStartButton->mDisabledImage = nullptr;
 		mStartButton->mOverOverlayImage = nullptr;
 		mStartButton->SetFont(Sexy::FONT_HOUSEOFTERROR20);
-		mStartButton->mColors[ButtonWidget::COLOR_LABEL] = Color(255, 255, 255);
-		mStartButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(213, 159, 43);
+		mStartButton->SetLabelColor(Color(255, 255, 255));
+		mStartButton->SetLabelHiliteColor(Color(213, 159, 43));
 		mStartButton->Resize(325, 505, 190, 73);
 		mStartButton->mTextOffsetX = 33;
 		mStartButton->mTextOffsetY = -2;
@@ -252,12 +252,7 @@ AwardScreen::AwardScreen(LawnApp* theApp, AwardType theAwardType, bool theShowin
 		mApp->mMusic->MakeSureMusicIsPlaying(MUSIC_TUNE_ZEN_GARDEN);
 }
 
-AwardScreen::~AwardScreen()
-{
-	if (mStartButton) delete mStartButton;
-	if (mContinueButton) delete mContinueButton;
-	if (mMenuButton) delete mMenuButton;
-}
+AwardScreen::~AwardScreen() = default;
 
 bool AwardScreen::IsPaperNote()
 {
@@ -577,18 +572,16 @@ void AwardScreen::StartButtonPressed()
 	}
 }
 
-void AwardScreen::MouseDown(int x, int y, int theClickCount)
+void AwardScreen::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, int theClickCount)
 {
-	(void)x;(void)y;
 	if (theClickCount == 1) {
 		if (mStartButton->IsMouseOver() || mMenuButton->IsMouseOver() || mContinueButton->IsMouseOver())
 			mApp->PlaySample(Sexy::SOUND_TAP);
 	}
 }
 
-void AwardScreen::MouseUp(int x, int y, int theClickCount)
+void AwardScreen::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, int theClickCount)
 {
-	(void)x;(void)y;
 	if (theClickCount == 1)
 	{
 		if (mStartButton->IsMouseOver())

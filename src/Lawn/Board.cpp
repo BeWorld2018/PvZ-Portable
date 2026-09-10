@@ -22,6 +22,7 @@
 #include <time.h>
 #include <algorithm>
 #include <SDL.h>
+#include <format>
 #include "ZenGarden.h"
 #include "BoardInclude.h"
 #include "LawnCommon.h"
@@ -60,7 +61,6 @@ constexpr const int ZOMBIE_COUNTDOWN = 2500;
 constexpr const int ZOMBIE_COUNTDOWN_RANGE = 600;
 constexpr const int ZOMBIE_COUNTDOWN_BEFORE_FLAG = 4500;
 constexpr const int ZOMBIE_COUNTDOWN_BEFORE_REPICK = 5499;
-constexpr const int ZOMBIE_COUNTDOWN_MIN = 400;
 constexpr const int SUN_COUNTDOWN = 425;
 constexpr const int SUN_COUNTDOWN_RANGE = 275;
 constexpr const int SUN_COUNTDOWN_MAX = 950;
@@ -73,7 +73,6 @@ Board::Board(LawnApp* theApp)
 {
 	mApp = theApp;
 	mApp->mBoard = this;
-	PvzpHesitationTrace("preboard");
 
 	mZombies.DataArrayInitialize(1024U, "zombies");
 	mPlants.DataArrayInitialize(1024U, "plants");
@@ -81,7 +80,6 @@ Board::Board(LawnApp* theApp)
 	mCoins.DataArrayInitialize(1024U, "coins");
 	mLawnMowers.DataArrayInitialize(32U, "lawnmowers");
 	mGridItems.DataArrayInitialize(128U, "griditems");
-	PvzpHesitationTrace("board dataarrays");
 
 	mApp->mEffectSystem->EffectSystemFreeAll();
 	mBoardRandSeed = mApp->mAppRandSeed;
@@ -91,10 +89,10 @@ Board::Board(LawnApp* theApp)
 	}
 	mCoinBankFadeCount = 0;
 	mLevel = 0;
-	mCursorObject = new CursorObject();
-	mCursorPreview = new CursorPreview();
-	mSeedBank = new SeedBank();
-	mCutScene = new CutScene();
+	mCursorObject = std::make_unique<CursorObject>();
+	mCursorPreview = std::make_unique<CursorPreview>();
+	mSeedBank = std::make_unique<SeedBank>();
+	mCutScene = std::make_unique<CutScene>();
 	mSpecialGraveStoneX = -1;
 	mSpecialGraveStoneY = -1;
 	for (int i = 0; i < MAX_GRID_SIZE_X; i++)
@@ -183,18 +181,18 @@ Board::Board(LawnApp* theApp)
 	mDaisyMode = mApp->mDaisyMode;
 	mSukhbirMode = mApp->mSukhbirMode;
 	mShowShovel = false;
-	mToolTip = new ToolTipWidget();
-	mAdvice = new MessageWidget(mApp);
+	mToolTip = std::make_unique<ToolTipWidget>();
+	mAdvice = std::make_unique<MessageWidget>(mApp);
 	mBackground = BackgroundType::BACKGROUND_1_DAY;
 	mMainCounter = 0;
 	mBoardUpdateCounter = 0;
 	mTutorialState = TutorialState::TUTORIAL_OFF;
 	mTutorialTimer = -1;
 	mTutorialParticleID = ParticleSystemID::PARTICLESYSTEMID_NULL;
-	mChallenge = new Challenge();
+	mChallenge = std::make_unique<Challenge>();
 	mClip = false;
 	mDebugTextMode = DebugTextMode::DEBUG_TEXT_NONE;
-	mMenuButton = new GameButton(0);
+	mMenuButton = std::make_unique<GameButton>(0);
 	mMenuButton->mDrawStoneButton = true;
 	mStoreButton = nullptr;
 	mIgnoreMouseUp = false;
@@ -204,7 +202,7 @@ Board::Board(LawnApp* theApp)
 		mMenuButton->SetLabel("[MAIN_MENU_BUTTON]");
 		mMenuButton->Resize(628, -10, 163, 46);
 
-		mStoreButton = new GameButton(1);
+		mStoreButton = std::make_unique<GameButton>(1);
 		mStoreButton->mButtonImage = IMAGE_ZENSHOPBUTTON;
 		mStoreButton->mOverImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
 		mStoreButton->mDownImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
@@ -219,7 +217,7 @@ Board::Board(LawnApp* theApp)
 
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 	{
-		mStoreButton = new GameButton(1);
+		mStoreButton = std::make_unique<GameButton>(1);
 		mStoreButton->mDrawStoneButton = true;
 		mStoreButton->mBtnNoDraw = true;
 		mStoreButton->mDisabled = true;
@@ -230,40 +228,14 @@ Board::Board(LawnApp* theApp)
 		mMenuButton->SetLabel("[MAIN_MENU_BUTTON]");
 		mMenuButton->Resize(628, -10, 163, 46);
 
-		mStoreButton = new GameButton(1);
+		mStoreButton = std::make_unique<GameButton>(1);
 		mStoreButton->mDrawStoneButton = true;
 		mStoreButton->mBtnNoDraw = true;
 		mStoreButton->SetLabel("[GET_FULL_VERSION_BUTTON]");
 	}
 }
 
-Board::~Board()
-{
-	delete mAdvice;
-	delete mCursorObject;
-	delete mCursorPreview;
-	delete mSeedBank;
-	if (mMenuButton)
-	{
-		delete mMenuButton;
-	}
-	if (mStoreButton)
-	{
-		delete mStoreButton;
-	}
-	mZombies.DataArrayDispose();
-	mPlants.DataArrayDispose();
-	mProjectiles.DataArrayDispose();
-	mCoins.DataArrayDispose();
-	mLawnMowers.DataArrayDispose();
-	mGridItems.DataArrayDispose();
-	if (mToolTip)
-	{
-		delete mToolTip;
-	}
-	delete mCutScene;
-	delete mChallenge;
-}
+Board::~Board() = default;
 
 void BoardInitForPlayer()
 {
@@ -446,13 +418,6 @@ GridItem* Board::GetScaryPotAt(int theGridX, int theGridY)
 	return GetGridItemAt(GridItemType::GRIDITEM_SCARY_POT, theGridX, theGridY);
 }
 
-/*
-GridItem* Board::GetSquirrelAt(int theGridX, int theGridY)
-{
-	return GetGridItemAt(GridItemType::GRIDITEM_SQUIRREL, theGridX, theGridY);
-}
-*/
-
 GridItem* Board::GetZenToolAt(int theGridX, int theGridY)
 {
 	return GetGridItemAt(GridItemType::GRIDITEM_ZEN_TOOL, theGridX, theGridY);
@@ -546,8 +511,7 @@ void Board::AddGraveStones(int theGridX, int theCount, MTRand& theLevelRNG)
 		// re-check each time instead of a cached allowance array, which could go stale if AddAGraveStone() changes
 		if (CanAddGraveStoneAt(theGridX, aGridY))
 		{
-			GridItem* aGraveStone = AddAGraveStone(theGridX, aGridY);
-			(void)aGraveStone; // unused
+			AddAGraveStone(theGridX, aGridY);
 			++i;
 		}
 	}
@@ -1209,7 +1173,7 @@ bool Board::IsZombieWaveDistributionOk()
 	{
 		if (aZombieType != ZombieType::ZOMBIE_YETI && CanZombieSpawnOnLevel(aZombieType, mLevel) && aZombieTypeCount[aZombieType] == 0)
 		{
-			PvzpTraceAndLogLn("Didn't spawn required zombie %s, level %d", GetZombieDefinition(aZombieType).mZombieName, mLevel);
+			PvzpLogLn("Didn't spawn required zombie {}, level {}", GetZombieDefinition(aZombieType).mZombieName, mLevel);
 			return false;
 		}
 	}
@@ -2189,16 +2153,16 @@ void Board::GetPlantsOnLawn(int theGridX, int theGridY, PlantsOnLawn* thePlantOn
 	{
 		if (aPlant->mDead)
 			continue;
+		if (aPlant->mRow != theGridY)
+		{
+			continue;
+		}
 		SeedType aSeedType = aPlant->mSeedType;
 		if (aSeedType == SeedType::SEED_IMITATER && aPlant->mImitaterType != SeedType::SEED_NONE)
 		{
 			aSeedType = aPlant->mImitaterType;
 		}
 
-		if (aPlant->mRow != theGridY)
-		{
-			continue;
-		}
 		if (aSeedType == SeedType::SEED_COBCANNON)
 		{
 			if (aPlant->mPlantCol < theGridX - 1 || aPlant->mPlantCol > theGridX)
@@ -2646,7 +2610,7 @@ Zombie* Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
 {
 	if (mZombies.mSize >= mZombies.mMaxSize - 1)
 	{
-		PvzpTrace("Too many zombies!!");
+		PvzpLogLn("Too many zombies!!");
 		return nullptr;
 	}
 
@@ -2935,7 +2899,7 @@ PlantingReason Board::CanPlantAt(int theGridX, int theGridY, SeedType theSeedTyp
 	return PlantingReason::PLANTING_OK;
 }
 
-void Board::UpdateCursor()
+void Board::UpdateCursor(const HitResult* theHitResult)
 {
 	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX;
 	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY;
@@ -2955,9 +2919,13 @@ void Board::UpdateCursor()
 		return;
 	}
 
-	HitResult aHitResult;
-	MouseHitTest(aMouseX, aMouseY, &aHitResult);
-	switch (aHitResult.mObjectType)
+	HitResult aLocalHitResult;
+	if (theHitResult == nullptr)
+	{
+		MouseHitTest(aMouseX, aMouseY, &aLocalHitResult);
+		theHitResult = &aLocalHitResult;
+	}
+	switch (theHitResult->mObjectType)
 	{
 	case GameObjectType::OBJECT_TYPE_MENU_BUTTON:
 	case GameObjectType::OBJECT_TYPE_STORE_BUTTON:
@@ -2981,7 +2949,7 @@ void Board::UpdateCursor()
 		break;
 
 	case GameObjectType::OBJECT_TYPE_SEEDPACKET:
-		aShowFinger = ((SeedPacket*)aHitResult.mObject)->CanPickUp();
+		aShowFinger = ((SeedPacket*)theHitResult->mObject)->CanPickUp();
 		break;
 
 	case GameObjectType::OBJECT_TYPE_SCARY_POT:
@@ -3000,7 +2968,7 @@ void Board::UpdateCursor()
 		{
 			aShowFinger = true;
 		}
-		if (((Plant*)aHitResult.mObject)->mState == PlantState::STATE_COBCANNON_READY)
+		if (((Plant*)theHitResult->mObject)->mState == PlantState::STATE_COBCANNON_READY)
 		{
 			aShowFinger = true;
 		}
@@ -3091,7 +3059,7 @@ bool Board::IsPlantInGoldWateringCanRange(int theMouseX, int theMouseY, Plant* t
 	return false;
 }
 
-void Board::HighlightPlantsForMouse(int theMouseX, int theMouseY)
+void Board::HighlightPlantsForMouse(int theMouseX, int theMouseY, const HitResult* theHitResult)
 {
 	if (mCursorObject->mCursorType == CursorType::CURSOR_TYPE_WATERING_CAN && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_GOLD_WATERINGCAN])
 	{
@@ -3112,7 +3080,7 @@ void Board::HighlightPlantsForMouse(int theMouseX, int theMouseY)
 	}
 	else
 	{
-		Plant* aPlant = ToolHitTest(theMouseX, theMouseY);
+		Plant* aPlant = theHitResult->mObjectType == GameObjectType::OBJECT_TYPE_PLANT ? ToolHitTestHelper(theHitResult) : nullptr;
 		if (aPlant)
 		{
 			aPlant->mHighlighted = true;
@@ -3130,18 +3098,20 @@ void Board::HighlightPlantsForMouse(int theMouseX, int theMouseY)
 
 void Board::UpdateMousePosition()
 {
-	UpdateCursor();
-	UpdateToolTip();
+	SeedType aCursorSeedType = GetSeedTypeInCursor();
+	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX;
+	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY;
+	HitResult aHitResult;
+	MouseHitTest(aMouseX, aMouseY, &aHitResult);
+
+	UpdateCursor(&aHitResult);
+	UpdateToolTip(&aHitResult);
 	for (Plant* aPlant : mPlants)
 	{
 		if (aPlant->mDead)
 			continue;
 		aPlant->mHighlighted = false;
 	}
-
-	SeedType aCursorSeedType = GetSeedTypeInCursor();
-	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY;
 
 	if (mApp->IsScaryPotterLevel())
 	{
@@ -3155,8 +3125,6 @@ void Board::UpdateMousePosition()
 			}
 		}
 
-		HitResult aHitResult;
-		MouseHitTest(aMouseX, aMouseY, &aHitResult);
 		if (aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_SCARY_POT)
 		{
 			GridItem* aScaryPot = (GridItem*)aHitResult.mObject;
@@ -3170,8 +3138,6 @@ void Board::UpdateMousePosition()
 		GridItem* aStinky = mApp->mZenGarden->GetStinky();
 		if (aStinky)
 		{
-			HitResult aHitResult;
-			MouseHitTest(aMouseX, aMouseY, &aHitResult);
 			aStinky->mHighlighted = aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_STINKY;
 		}
 	}
@@ -3186,7 +3152,7 @@ void Board::UpdateMousePosition()
 		mCursorObject->mCursorType == CursorType::CURSOR_TYPE_MONEY_SIGN ||
 		(mCursorObject->mCursorType == CursorType::CURSOR_TYPE_WHEEELBARROW && !mApp->mZenGarden->GetPottedPlantInWheelbarrow()))
 	{
-		HighlightPlantsForMouse(aMouseX, aMouseY);
+		HighlightPlantsForMouse(aMouseX, aMouseY, &aHitResult);
 		return;
 	}
 
@@ -3226,7 +3192,7 @@ void Board::UpdateMousePosition()
 	}
 }
 
-void Board::UpdateToolTip()
+void Board::UpdateToolTip(const HitResult* theHitResult)
 {
 	if (!mApp->mWidgetManager->mMouseIn || !mApp->mActive || mTimeStopCounter > 0 || mApp->GetDialogCount() > 0 || mApp->mGameScene == GameScenes::SCENE_ZOMBIES_WON)
 	{
@@ -3261,7 +3227,7 @@ void Board::UpdateToolTip()
 			return;
 		}
 
-		std::string aZombieName = StrFormat("[%s]", GetZombieDefinition(aZombie->mZombieType).mZombieName);
+		std::string aZombieName = std::format("[{}]", GetZombieDefinition(aZombie->mZombieType).mZombieName);
 		mToolTip->SetTitle(aZombieName);
 		if (mApp->CanShowAlmanac() && aZombie->mZombieType != ZombieType::ZOMBIE_REDEYE_GARGANTUAR)
 		{
@@ -3317,15 +3283,19 @@ void Board::UpdateToolTip()
 	mToolTip->SetLabel("");
 	mToolTip->SetWarningText("");
 	mToolTip->mCenter = false;
-	if (mChallenge->UpdateToolTip(aMouseX, aMouseY))
+	if (mChallenge->UpdateToolTip(aMouseX, aMouseY, theHitResult))
 	{
 		return;
 	}
 
-	HitResult aHitResult;
-	MouseHitTest(aMouseX, aMouseY, &aHitResult);
+	HitResult aLocalHitResult;
+	if (theHitResult == nullptr)
+	{
+		MouseHitTest(aMouseX, aMouseY, &aLocalHitResult);
+		theHitResult = &aLocalHitResult;
+	}
 
-	switch (aHitResult.mObjectType)
+	switch (theHitResult->mObjectType)
 	{
 	case GameObjectType::OBJECT_TYPE_SHOVEL:
 	{
@@ -3383,10 +3353,10 @@ void Board::UpdateToolTip()
 		return;
 	}
 
-	if (aHitResult.mObjectType != GameObjectType::OBJECT_TYPE_SEEDPACKET)
+	if (theHitResult->mObjectType != GameObjectType::OBJECT_TYPE_SEEDPACKET)
 	{
 		Rect aButtonRect = GetShovelButtonRect();
-		GetZenButtonRect(aHitResult.mObjectType, aButtonRect);
+		GetZenButtonRect(theHitResult->mObjectType, aButtonRect);
 		this->mToolTip->mX = aButtonRect.mX + 35;
 		this->mToolTip->mY = aButtonRect.mY + 72;
 		this->mToolTip->mCenter = true;
@@ -3394,7 +3364,7 @@ void Board::UpdateToolTip()
 		return;
 	}
 
-	SeedPacket* aSeedPacket = (SeedPacket*)aHitResult.mObject;
+	SeedPacket* aSeedPacket = (SeedPacket*)theHitResult->mObject;
 	SeedType aUseSeedType = aSeedPacket->mPacketType;
 	if (aSeedPacket->mPacketType == SeedType::SEED_IMITATER && aSeedPacket->mImitaterType != SeedType::SEED_NONE)
 	{
@@ -3979,9 +3949,8 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount)
 	ClearCursor();
 }
 
-Plant* Board::ToolHitTestHelper(HitResult* theHitResult)
+Plant* Board::ToolHitTestHelper(const HitResult* theHitResult)
 {
-	theHitResult->mObjectType = GameObjectType::OBJECT_TYPE_PLANT;
 	Plant* aPlant = (Plant*)theHitResult->mObject;
 	return (aPlant->mSeedType != SeedType::SEED_GRAVEBUSTER || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN) ? aPlant : nullptr;
 }
@@ -6104,8 +6073,6 @@ static inline void AddUIRenderItem(RenderItem* theRenderList, int& theCurRenderI
 
 void Board::DrawGameObjects(Graphics* g)
 {
-	PvzpHesitationTrace("creating render list");
-
 	RenderItem aRenderList[MAX_RENDER_ITEMS];
 	int aRenderItemCount = 0;
 
@@ -6313,12 +6280,10 @@ void Board::DrawGameObjects(Graphics* g)
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_STORM, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 3));
 	}
-	AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreview);
+	AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreview.get());
 
-	PvzpHesitationTrace("start sort");
 	std::sort(aRenderList, aRenderList + aRenderItemCount, RenderItemSortFunc);
 
-	PvzpHesitationTrace("end sort, start draw");
 	for (int i = 0; i < aRenderItemCount; i++)
 	{
 		RenderItem& aRenderItem = aRenderList[i];
@@ -6518,7 +6483,6 @@ void Board::DrawGameObjects(Graphics* g)
 		}
 	}
 
-	PvzpHesitationTrace("end draw");
 }
 
 bool Board::HasProgressMeter()
@@ -6578,29 +6542,29 @@ void Board::DrawProgressMeter(Graphics* g)
 	Color aColor(224, 187, 98);
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST)
 	{
-		std::string aMatchStr = StrFormat("%d/%d %s", mChallenge->mChallengeScore, 75, PvzpStringTranslate("[MATCHES]").c_str());
+		std::string aMatchStr = std::format("{}/{} {}", mChallenge->mChallengeScore, 75, PvzpStringTranslate("[MATCHES]"));
 		PvzpDrawString(g, aMatchStr, aPosX, 589, Sexy::FONT_DWARVENTODCRAFT12, aColor, DrawStringJustification::DS_ALIGN_CENTER);
 	}
 	else if (mApp->IsSquirrelLevel())
 	{
-		std::string aMatchStr = StrFormat("%d/%d %s", mChallenge->mChallengeScore, 7, PvzpStringTranslate("[SQUIRRELS]").c_str());
+		std::string aMatchStr = std::format("{}/{} {}", mChallenge->mChallengeScore, 7, PvzpStringTranslate("[SQUIRRELS]"));
 		PvzpDrawString(g, aMatchStr, aPosX, 589, Sexy::FONT_DWARVENTODCRAFT12, aColor, DrawStringJustification::DS_ALIGN_CENTER);
 	}
 	else if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_SLOT_MACHINE)
 	{
 		int aSunMoney = std::clamp(mSunMoney, 0, 2000);
-		std::string aMatchStr = StrFormat("%d/%d %s", aSunMoney, 2000, PvzpStringTranslate("[SUN]").c_str());
+		std::string aMatchStr = std::format("{}/{} {}", aSunMoney, 2000, PvzpStringTranslate("[SUN]"));
 		PvzpDrawString(g, aMatchStr, aPosX, 589, Sexy::FONT_DWARVENTODCRAFT12, aColor, DrawStringJustification::DS_ALIGN_CENTER);
 	}
 	else if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIQUARIUM)
 	{
 		int aSunMoney = std::clamp(mSunMoney, 0, 1000);
-		std::string aMatchStr = StrFormat("%d/%d %s", aSunMoney, 1000, PvzpStringTranslate("[SUN]").c_str());
+		std::string aMatchStr = std::format("{}/{} {}", aSunMoney, 1000, PvzpStringTranslate("[SUN]"));
 		PvzpDrawString(g, aMatchStr, aPosX, 589, Sexy::FONT_DWARVENTODCRAFT12, aColor, DrawStringJustification::DS_ALIGN_CENTER);
 	}
 	else if (mApp->IsIZombieLevel())
 	{
-		std::string aMatchStr = StrFormat("%d/%d %s", mChallenge->mChallengeScore, 5, PvzpStringTranslate("[BRAINS]").c_str());
+		std::string aMatchStr = std::format("{}/{} {}", mChallenge->mChallengeScore, 5, PvzpStringTranslate("[BRAINS]"));
 		PvzpDrawString(g, aMatchStr, aPosX, 589, Sexy::FONT_DWARVENTODCRAFT12, aColor, DrawStringJustification::DS_ALIGN_CENTER);
 	}
 	else if (ProgressMeterHasFlags())
@@ -6670,7 +6634,7 @@ void Board::DrawLevel(Graphics* g)
 	std::string aLevelStr;
 	if (mApp->IsAdventureMode())
 	{
-		aLevelStr = PvzpStringTranslate("[LEVEL]") + " " + mApp->GetStageString(mLevel);
+		aLevelStr = std::string(PvzpStringTranslate("[LEVEL]")) + " " + mApp->GetStageString(mLevel);
 	}
 	else
 	{
@@ -6682,7 +6646,7 @@ void Board::DrawLevel(Graphics* g)
 			{
 				std::string aFlagStr = mApp->Pluralize(aFlags, "[ONE_FLAG]", "[COUNT_FLAGS]");
 				std::string aCompletedStr = PvzpReplaceString("[FLAGS_COMPLETED]", "{FLAGS}", aFlagStr);
-				aLevelStr = StrFormat("%s - %s", PvzpStringTranslate(aLevelStr).c_str(), aCompletedStr.c_str());
+				aLevelStr = std::format("{} - {}", PvzpStringTranslate(aLevelStr), aCompletedStr);
 			}
 		}
 		else if (mApp->IsEndlessIZombie(mApp->mGameMode) || mApp->IsEndlessScaryPotter(mApp->mGameMode))
@@ -6695,7 +6659,7 @@ void Board::DrawLevel(Graphics* g)
 			if (aStreak > 0)
 			{
 				std::string aStreakStr = PvzpReplaceNumberString("[ENDLESS_STREAK]", "{STREAK}", aStreak);
-				aLevelStr = StrFormat("%s - %s", PvzpStringTranslate(aLevelStr).c_str(), aStreakStr.c_str());
+				aLevelStr = std::format("{} - {}", PvzpStringTranslate(aLevelStr), aStreakStr);
 			}
 		}
 	}
@@ -6808,7 +6772,7 @@ void Board::DrawZenButtons(Graphics* g)
 				g->DrawImage(Sexy::IMAGE_FERTILIZER, aButtonRect.mX - 6, aButtonRect.mY + aOffsetY - 7);
 				g->SetColorizeImages(false);
 
-				std::string aChargeString = StrFormat("x%d", aCharges);
+				std::string aChargeString = std::format("x{}", aCharges);
 				PvzpDrawString(g, aChargeString, aButtonRect.mX + 64, aButtonRect.mY + aOffsetY + 65, Sexy::FONT_HOUSEOFTERROR16, Color::White, DS_ALIGN_RIGHT);
 				break;
 			}
@@ -6824,7 +6788,7 @@ void Board::DrawZenButtons(Graphics* g)
 				g->DrawImage(Sexy::IMAGE_BUG_SPRAY, aButtonRect.mX, aButtonRect.mY + aOffsetY - 1);
 				g->SetColorizeImages(false);
 
-				std::string aChargeString = StrFormat("x%d", aCharges);
+				std::string aChargeString = std::format("x{}", aCharges);
 				PvzpDrawString(g, aChargeString, aButtonRect.mX + 64, aButtonRect.mY + aOffsetY + 65, Sexy::FONT_HOUSEOFTERROR16, Color::White, DS_ALIGN_RIGHT);
 				break;
 			}
@@ -6843,7 +6807,7 @@ void Board::DrawZenButtons(Graphics* g)
 				g->DrawImage(Sexy::IMAGE_CHOCOLATE, aButtonRect.mX + 6, aButtonRect.mY + aOffsetY + 4);
 				g->SetColorizeImages(false);
 
-				std::string aChargeString = StrFormat("x%d", aCharges);
+				std::string aChargeString = std::format("x{}", aCharges);
 				PvzpDrawString(g, aChargeString, aButtonRect.mX + 64, aButtonRect.mY + aOffsetY + 65, Sexy::FONT_HOUSEOFTERROR16, Color::White, DS_ALIGN_RIGHT);
 				break;
 			}
@@ -6877,7 +6841,7 @@ void Board::DrawZenButtons(Graphics* g)
 				g->DrawImage(Sexy::IMAGE_TREEFOOD, aButtonRect.mX - 6, aButtonRect.mY + aOffsetY - 7);
 				g->SetColorizeImages(false);
 
-				std::string aChargeString = StrFormat("x%d", aCharges);
+				std::string aChargeString = std::format("x{}", aCharges);
 				PvzpDrawString(g, aChargeString, aButtonRect.mX + 64, aButtonRect.mY + aOffsetY + 65, Sexy::FONT_HOUSEOFTERROR16, Color::White, DS_ALIGN_RIGHT);
 				break;
 			}
@@ -6930,36 +6894,36 @@ void Board::DrawDebugText(Graphics* g)
 		int aTime = mZombieCountDownStart - mZombieCountDown;
 		float aCountDownFraction = static_cast<float>(aTime) / static_cast<float>(mZombieCountDownStart);
 
-		aText += StrFormat("ZOMBIE SPAWNING DEBUG\n");
-		aText += StrFormat("CurrentWave: %d of %d\n", mCurrentWave, mNumWaves);
-		aText += StrFormat("TimeSinseLastSpawn: %d %s\n", aTime, aTime > 400 ? "" : "(too soon)");
-		aText += StrFormat("ZombieCountDown: %d/%d (%.0f%%)\n", mZombieCountDown, mZombieCountDownStart, aCountDownFraction);
+		aText += std::format("ZOMBIE SPAWNING DEBUG\n");
+		aText += std::format("CurrentWave: {} of {}\n", mCurrentWave, mNumWaves);
+		aText += std::format("TimeSinseLastSpawn: {} {}\n", aTime, aTime > 400 ? "" : "(too soon)");
+		aText += std::format("ZombieCountDown: {}/{} ({:.0f}%)\n", mZombieCountDown, mZombieCountDownStart, aCountDownFraction);
 
 		if (mZombieHealthToNextWave != -1)
 		{
 			int aTotalHealth = TotalZombiesHealthInWave(mCurrentWave - 1);
 			int aHealthRange = std::max(mZombieHealthWaveStart - mZombieHealthToNextWave, 1);
 			float aHealthFraction = static_cast<float>(mZombieHealthToNextWave - aTotalHealth + aHealthRange) / static_cast<float>(aHealthRange);
-			aText += StrFormat("ZombieHealth: CurZombieHealth %d trigger %d (%.0f%%)\n", aTotalHealth, mZombieHealthToNextWave, aHealthFraction * 100);
+			aText += std::format("ZombieHealth: CurZombieHealth {} trigger {} ({:.0f}%)\n", aTotalHealth, mZombieHealthToNextWave, aHealthFraction * 100);
 		}
 		else
 		{
-			aText += StrFormat("ZombieHealth: before first wave\n");
+			aText += std::format("ZombieHealth: before first wave\n");
 		}
 
 		if (mHugeWaveCountDown > 0)
 		{
-			aText += StrFormat("HugeWaveCountDown: %d\n", mHugeWaveCountDown);
+			aText += std::format("HugeWaveCountDown: {}\n", mHugeWaveCountDown);
 		}
 
 		Zombie* aBossZombie = GetBossZombie();
 		if (aBossZombie)
 		{
-			aText += StrFormat("\nSpawn: %d\n", aBossZombie->mSummonCounter);
-			aText += StrFormat("Stomp: %d\n", aBossZombie->mBossStompCounter);
-			aText += StrFormat("Bungee: %d\n", aBossZombie->mBossBungeeCounter);
-			aText += StrFormat("Head: %d\n", aBossZombie->mBossHeadCounter);
-			aText += StrFormat("Health: %d of %d\n", aBossZombie->mBodyHealth, aBossZombie->mBodyMaxHealth);
+			aText += std::format("\nSpawn: {}\n", aBossZombie->mSummonCounter);
+			aText += std::format("Stomp: {}\n", aBossZombie->mBossStompCounter);
+			aText += std::format("Bungee: {}\n", aBossZombie->mBossBungeeCounter);
+			aText += std::format("Head: {}\n", aBossZombie->mBossHeadCounter);
+			aText += std::format("Health: {} of {}\n", aBossZombie->mBodyHealth, aBossZombie->mBodyMaxHealth);
 		}
 
 		break;
@@ -6967,78 +6931,78 @@ void Board::DrawDebugText(Graphics* g)
 
 	case DebugTextMode::DEBUG_TEXT_MUSIC:
 	{
-		aText += StrFormat("MUSIC DEBUG\n");
-		aText += StrFormat("CurrentWave: %d of %d\n", mCurrentWave, mNumWaves);
+		aText += std::format("MUSIC DEBUG\n");
+		aText += std::format("CurrentWave: {} of {}\n", mCurrentWave, mNumWaves);
 
 		if (mApp->mMusic->mCurMusicFileMain == MusicFile::MUSIC_FILE_NONE)
 		{
-			aText += StrFormat("No music");
+			aText += std::format("No music");
 		}
 		else
 		{
-			aText += StrFormat("Music Burst: ");
+			aText += std::format("Music Burst: ");
 
 			if (mApp->mMusic->mMusicBurstState == MusicBurstState::MUSIC_BURST_OFF)
 			{
-				aText += StrFormat("Off");
+				aText += std::format("Off");
 			}
 			else if (mApp->mMusic->mMusicBurstState == MusicBurstState::MUSIC_BURST_STARTING)
 			{
-				aText += StrFormat("Starting %d/%d", mApp->mMusic->mBurstStateCounter, 400);
+				aText += std::format("Starting {}/{}", mApp->mMusic->mBurstStateCounter, 400);
 			}
 			else if (mApp->mMusic->mMusicBurstState == MusicBurstState::MUSIC_BURST_ON)
 			{
-				aText += StrFormat("On at least until %d/%d", mApp->mMusic->mBurstStateCounter, 800);
+				aText += std::format("On at least until {}/{}", mApp->mMusic->mBurstStateCounter, 800);
 			}
 			else if (mApp->mMusic->mMusicBurstState == MusicBurstState::MUSIC_BURST_FINISHING)
 			{
-				aText += StrFormat("Finishing %d/%d", mApp->mMusic->mBurstStateCounter, 400);
+				aText += std::format("Finishing {}/{}", mApp->mMusic->mBurstStateCounter, 400);
 			}
 
 			if (mApp->mMusic->mMusicDrumsState == MusicDrumsState::MUSIC_DRUMS_OFF)
 			{
-				aText += StrFormat(", Drums off");
+				aText += std::format(", Drums off");
 			}
 			else if (mApp->mMusic->mMusicDrumsState == MusicDrumsState::MUSIC_DRUMS_ON_QUEUED)
 			{
-				aText += StrFormat(", Drums queued on");
+				aText += std::format(", Drums queued on");
 			}
 			else if (mApp->mMusic->mMusicDrumsState == MusicDrumsState::MUSIC_DRUMS_ON)
 			{
-				aText += StrFormat(", Drums on");
+				aText += std::format(", Drums on");
 			}
 			else if (mApp->mMusic->mMusicDrumsState == MusicDrumsState::MUSIC_DRUMS_OFF_QUEUED)
 			{
-				aText += StrFormat(", Drums queued off");
+				aText += std::format(", Drums queued off");
 			}
 			else if (mApp->mMusic->mMusicDrumsState == MusicDrumsState::MUSIC_DRUMS_FADING)
 			{
-				aText += StrFormat(", Drums fading off %d/%d", mApp->mMusic->mDrumsStateCounter, 50);
+				aText += std::format(", Drums fading off {}/{}", mApp->mMusic->mDrumsStateCounter, 50);
 			}
-			aText += StrFormat("\n");
+			aText += std::format("\n");
 		}
 
 		break;
 	}
 
 	case DebugTextMode::DEBUG_TEXT_MEMORY:
-		aText += StrFormat("MEMORY DEBUG\n");
-		aText += StrFormat("attachments %d\n", mApp->mEffectSystem->mAttachmentHolder->mAttachments.mSize);
-		aText += StrFormat("emitters %d\n", mApp->mEffectSystem->mParticleHolder->mEmitters.mSize);
-		aText += StrFormat("particles %d\n", mApp->mEffectSystem->mParticleHolder->mParticles.mSize);
-		aText += StrFormat("particle systems %d\n", mApp->mEffectSystem->mParticleHolder->mParticleSystems.mSize);
-		aText += StrFormat("trails %d\n", mApp->mEffectSystem->mTrailHolder->mTrails.mSize);
-		aText += StrFormat("reanimation %d\n", mApp->mEffectSystem->mReanimationHolder->mReanimations.mSize);
-		aText += StrFormat("zombies %d\n", mZombies.mSize);
-		aText += StrFormat("plants %d\n", mPlants.mSize);
-		aText += StrFormat("projectiles %d\n", mProjectiles.mSize);
-		aText += StrFormat("coins %d\n", mCoins.mSize);
-		aText += StrFormat("lawn mowers %d\n", mLawnMowers.mSize);
-		aText += StrFormat("grid items %d\n", mGridItems.mSize);
+		aText += std::format("MEMORY DEBUG\n");
+		aText += std::format("attachments {}\n", mApp->mEffectSystem->mAttachmentHolder->mAttachments.mSize);
+		aText += std::format("emitters {}\n", mApp->mEffectSystem->mParticleHolder->mEmitters.mSize);
+		aText += std::format("particles {}\n", mApp->mEffectSystem->mParticleHolder->mParticles.mSize);
+		aText += std::format("particle systems {}\n", mApp->mEffectSystem->mParticleHolder->mParticleSystems.mSize);
+		aText += std::format("trails {}\n", mApp->mEffectSystem->mTrailHolder->mTrails.mSize);
+		aText += std::format("reanimation {}\n", mApp->mEffectSystem->mReanimationHolder->mReanimations.mSize);
+		aText += std::format("zombies {}\n", mZombies.mSize);
+		aText += std::format("plants {}\n", mPlants.mSize);
+		aText += std::format("projectiles {}\n", mProjectiles.mSize);
+		aText += std::format("coins {}\n", mCoins.mSize);
+		aText += std::format("lawn mowers {}\n", mLawnMowers.mSize);
+		aText += std::format("grid items {}\n", mGridItems.mSize);
 		break;
 
 	case DebugTextMode::DEBUG_TEXT_COLLISION:
-		aText += StrFormat("COLLISION DEBUG\n");
+		aText += std::format("COLLISION DEBUG\n");
 		break;
 
 	default:
@@ -7047,13 +7011,16 @@ void Board::DrawDebugText(Graphics* g)
 	}
 
 	g->SetFont(FONT_PICO129);
-	g->SetColor(Color::Black);
-	g->DrawStringWordWrapped(aText, 10, 89);
-	g->DrawStringWordWrapped(aText, 11, 91);
-	g->DrawStringWordWrapped(aText, 9, 90);
-	g->DrawStringWordWrapped(aText, 11, 90);
-	g->SetColor(Color(255, 255, 255));
-	g->DrawStringWordWrapped(aText, 10, 90);
+	if (!aText.empty())
+	{
+		g->SetColor(Color::Black);
+		g->DrawStringWordWrapped(aText, 10, 89);
+		g->DrawStringWordWrapped(aText, 11, 91);
+		g->DrawStringWordWrapped(aText, 9, 90);
+		g->DrawStringWordWrapped(aText, 11, 90);
+		g->SetColor(Color(255, 255, 255));
+		g->DrawStringWordWrapped(aText, 10, 90);
+	}
 }
 
 void Board::DrawDebugObjectRects(Graphics* g)
@@ -7352,7 +7319,12 @@ void Board::UpdateFog()
 
 void Board::DrawFog(Graphics* g)
 {
-	Image* aImageFog = mApp->Is3DAccelerated() ? Sexy::IMAGE_FOG : Sexy::IMAGE_FOG_SOFTWARE;
+	bool aIs3DAccelerated = mApp->Is3DAccelerated();
+	Image* aImageFog = aIs3DAccelerated ? Sexy::IMAGE_FOG : Sexy::IMAGE_FOG_SOFTWARE;
+	// the fog animation uses 900- and 500-frame periods; mod by their lcm (4500) to avoid float precision loss on large counters
+	constexpr uint32_t FOG_ANIM_PERIOD = 4500;
+	float aTime = static_cast<float>(mMainCounter % FOG_ANIM_PERIOD) * PI * 2;
+	g->SetColorizeImages(true);
 	for (int x = 0; x < MAX_GRID_SIZE_X; x++)
 	{
 		for (int y = 0; y < MAX_GRID_SIZE_Y + 1; y++)
@@ -7366,16 +7338,13 @@ void Board::DrawFog(Graphics* g)
 			int aCelCol = aCelLook % 8;
 			float aPosX = x * 80 + mFogOffset - 15;
 			float aPosY = y * 85 + 20;
-			// the fog animation uses 900- and 500-frame periods; mod by their lcm (4500) to avoid float precision loss on large counters
-			constexpr uint32_t FOG_ANIM_PERIOD = 4500;
-			float aTime = static_cast<float>(mMainCounter % FOG_ANIM_PERIOD) * PI * 2;
 			float aPhaseX = 6 * PI * x / MAX_GRID_SIZE_X;
 			float aPhaseY = 6 * PI * y / (MAX_GRID_SIZE_Y + 1);
 			float aMotion = 13 + 4 * sin(aTime / 900 + aPhaseY) + 8 * sin(aTime / 500 + aPhaseX);
 
 			int aColorVariant = 255 - aCelLook * 1.5 - aMotion * 1.5;
 			int aLightnessVariant = 255 - aCelLook - aMotion;
-			if (!mApp->Is3DAccelerated())
+			if (!aIs3DAccelerated)
 			{
 				aPosX += 10;
 				aPosY += 3;
@@ -7384,7 +7353,6 @@ void Board::DrawFog(Graphics* g)
 				aLightnessVariant = 255;
 			}
 
-			g->SetColorizeImages(true);
 			g->SetColor(Color(aColorVariant, aColorVariant, aLightnessVariant, aFadeAmount));
 			g->DrawImageCel(aImageFog, aPosX, aPosY, aCelCol, 0);
 
@@ -7392,9 +7360,9 @@ void Board::DrawFog(Graphics* g)
 			{
 				g->DrawImageCel(aImageFog, aPosX + 80, aPosY, aCelCol, 0);
 			}
-			g->SetColorizeImages(false);
 		}
 	}
+	g->SetColorizeImages(false);
 }
 
 bool Board::IsScaryPotterDaveTalking()
@@ -7698,7 +7666,7 @@ void Board::KeyDown(KeyCode theKey)
 
 static void PvzpCrash()
 {
-	PVZP_ASSERT(false, "Crash%s", "!!!!");
+	PVZP_ASSERT(false, "Crash{}", "!!!!");
 }
 
 void Board::KeyChar(char theChar)
@@ -7706,7 +7674,7 @@ void Board::KeyChar(char theChar)
 	if (!mApp->mDebugKeysEnabled)
 		return;
 
-	PvzpTraceAndLogLn("Board cheat key '%c'", theChar);
+	PvzpLogLn("Board cheat key '{}'", theChar);
 
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 	{

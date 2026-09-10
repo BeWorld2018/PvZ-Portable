@@ -23,6 +23,7 @@
 #define __PVZPPARTICLE_H__
 
 #include <cstdint>
+#include <memory>
 #include "PvzpList.h"
 #include "DataArray.h"
 #include "misc/SexyVector.h"
@@ -34,8 +35,8 @@ namespace Sexy
 //using namespace std;
 using namespace Sexy;
 
-#define MAX_PARTICLES_SIZE 900
-#define MAX_PARTICLE_FIELDS 4
+constexpr const int MAX_PARTICLES_SIZE = 900;
+constexpr const int MAX_PARTICLE_FIELDS = 4;
 
 // Particle system definitions
 
@@ -179,7 +180,7 @@ public:
 };
 
 extern int gParticleDefCount;
-extern PvzpParticleDefinition* gParticleDefArray;    // loaded and assigned in LawnApp::LoadingThreadProc()
+extern std::unique_ptr<PvzpParticleDefinition[]> gParticleDefArray;    // loaded and assigned in LawnApp::LoadingThreadProc()
 
 // Maps a particle system type to the file name of its data file
 class ParticleParams

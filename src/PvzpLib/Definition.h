@@ -23,9 +23,13 @@
 #define __PVZPDEFINITION_H__
 
 #include <string>
+#include <format>
+#include "PvzpCommon.h"
 #include "PvzpList.h"
+#include "PvzpDebug.h"
 #include "Reanimator.h"
 #include "PvzpParticle.h"
+#include "../SexyAppFramework/misc/XMLParser.h"
 
 enum class DefFieldType : int
 {
@@ -131,7 +135,14 @@ bool                    IsFileInPakFile(const std::string& theFilePath);
 bool                    DefinitionIsCompiled(const std::string& theXMLFilePath);
 bool                    DefinitionReadCompiledFile(const std::string& theCompiledFilePath, const DefMap* theDefMap, void* theDefinition);
 void                    DefinitionFillWithDefaults(const DefMap* theDefMap, void* theDefinition);
-void                    DefinitionXmlError(XMLParser* theXmlParser, char* theFormat, ...);
+template<typename... Args>
+void                    DefinitionXmlError(XMLParser* theXmlParser, std::format_string<Args...> theFormat, Args&&... theArgs)
+{
+	std::string aFormattedMessage = std::vformat(theFormat.get(), std::make_format_args(theArgs...));
+	int aLine = theXmlParser->GetCurrentLineNum();
+	std::string aFileName = theXmlParser->GetFileName();
+	PvzpLogLn("{}({}): XML Definition Error: {}", aFileName, aLine, aFormattedMessage);
+}
 bool                    DefSymbolValueFromString(const DefSymbol* theSymbolMap, const char* theName, int* theResultValue);
 bool                    DefinitionReadXMLString(XMLParser* theXmlParser, std::string& theValue);
 bool                    DefinitionReadIntField(XMLParser* theXmlParser, int* theValue);
@@ -184,10 +195,44 @@ bool                    DefinitionLoadXML(const std::string& theFilename, const 
 void                    DefinitionFreeArrayField(DefinitionArrayDef* theArray, const DefMap* theDefMap);
 void                    DefinitionFreeMap(const DefMap* theDefMap, void* theDefinition);
 
-bool         FloatTrackIsSet(const FloatParameterTrack& theTrack);
+inline bool  FloatTrackIsSet(const FloatParameterTrack& theTrack)
+{
+	return theTrack.mCountNodes != 0 && theTrack.mNodes[0].mCurveType != PvzpCurves::CURVE_CONSTANT;
+}
+
 void         FloatTrackSetDefault(FloatParameterTrack& theTrack, float theValue);
-float                   FloatTrackEvaluate(FloatParameterTrack& theTrack, float theTimeValue, float theInterp);
-float                   FloatTrackEvaluateFromLastTime(FloatParameterTrack& theTrack, float theTimeValue, float theInterp);
+
+inline float FloatTrackEvaluate(FloatParameterTrack& theTrack, float theTimeValue, float theInterp)
+{
+	if (theTrack.mCountNodes == 0)
+		return 0.0f;
+
+	if (theTimeValue < theTrack.mNodes[0].mTime)
+		return PvzpCurveEvaluate(theInterp, theTrack.mNodes[0].mLowValue, theTrack.mNodes[0].mHighValue, theTrack.mNodes[0].mDistribution);
+
+	for (int i = 1; i < theTrack.mCountNodes; i++)
+	{
+		FloatParameterTrackNode* aNodeNxt = &theTrack.mNodes[i];
+		if (theTimeValue <= aNodeNxt->mTime)
+		{
+			FloatParameterTrackNode* aNodeCur = &theTrack.mNodes[i - 1];
+			// Progress of theTimeValue from the current node to the next
+			float aTimeFraction = (theTimeValue - aNodeCur->mTime) / (aNodeNxt->mTime - aNodeCur->mTime);
+			float aLeftValue = PvzpCurveEvaluate(theInterp, aNodeCur->mLowValue, aNodeCur->mHighValue, aNodeCur->mDistribution);
+			float aRightValue = PvzpCurveEvaluate(theInterp, aNodeNxt->mLowValue, aNodeNxt->mHighValue, aNodeNxt->mDistribution);
+			return PvzpCurveEvaluate(aTimeFraction, aLeftValue, aRightValue, aNodeCur->mCurveType);
+		}
+	}
+
+	FloatParameterTrackNode* aLastNode = &theTrack.mNodes[theTrack.mCountNodes - 1];  // theTimeValue is past the last node
+	return PvzpCurveEvaluate(theInterp, aLastNode->mLowValue, aLastNode->mHighValue, aLastNode->mDistribution);
+}
+
+inline float FloatTrackEvaluateFromLastTime(FloatParameterTrack& theTrack, float theTimeValue, float theInterp)
+{
+	return theTimeValue < 0.0f ? 0.0f : FloatTrackEvaluate(theTrack, theTimeValue, theInterp);
+}
+
 bool         FloatTrackIsConstantZero(FloatParameterTrack& theTrack);
 
 #endif

@@ -26,10 +26,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <SDL.h>
 
 using namespace Sexy;
 
-#define MAX_KEYNAME_LEN 12
+constexpr const int MAX_KEYNAME_LEN = 12;
 
 typedef struct
 {
@@ -135,7 +136,7 @@ KeyCode	Sexy::GetKeyCodeFromName(const std::string& theKeyName)
 	if (theKeyName.length() >= MAX_KEYNAME_LEN-1)
 		return KEYCODE_UNKNOWN;
 
-	strcpy(aKeyName, theKeyName.c_str());
+	SDL_strlcpy(aKeyName, theKeyName.c_str(), sizeof(aKeyName));
 	char *s = aKeyName;
 	while (*s)
 	{

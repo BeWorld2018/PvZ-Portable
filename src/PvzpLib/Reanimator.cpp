@@ -33,11 +33,12 @@
 #include "misc/PerfTimer.h"
 #include "graphics/MemoryImage.h"
 #include <algorithm>
+#include <format>
 
 constexpr const int NO_BASE_POSE = -2;
 
 unsigned int gReanimatorDefCount;
-ReanimatorDefinition* gReanimatorDefArray;
+std::unique_ptr<ReanimatorDefinition[]> gReanimatorDefArray;
 unsigned int gReanimationParamArraySize;
 const ReanimationParams* gReanimationParamArray;
 
@@ -364,15 +365,13 @@ void ReanimationCreateAtlas(ReanimatorDefinition* theDefinition, ReanimationType
 
 	PerfTimer aTimer;
 	aTimer.Start();
-	PvzpHesitationTrace("preatlas");
 	ReanimAtlas* aAtlas = new ReanimAtlas();
 	theDefinition->mReanimAtlas = aAtlas;
 	aAtlas->ReanimAtlasCreate(theDefinition);
 
-	PvzpHesitationTrace("atlas '%s'", aParam.mReanimFileName);
 	int aDuration = std::max(aTimer.GetDuration(), 0.0);
 	if (aDuration > 20 && theReanimationType != ReanimationType::REANIM_NONE)  // report slow atlas creation
-		PvzpTraceAndLogLn("LOADING:Long atlas '%s' %d ms on %s", aParam.mReanimFileName, aDuration, LawnGetCurrentLevelName().c_str());
+		PvzpLogLn("LOADING:Long atlas '{}' {} ms on {}", aParam.mReanimFileName, aDuration, LawnGetCurrentLevelName());
 }
 
 void ReanimationPreload(ReanimationType theReanimationType)
@@ -383,7 +382,7 @@ void ReanimationPreload(ReanimationType theReanimationType)
 	ReanimationCreateAtlas(aReanimDef, theReanimationType);
 	if (aReanimDef->mReanimAtlas)
 	{
-		PvzpSandImageIfNeeded(aReanimDef->mReanimAtlas->mMemoryImage);
+		PvzpSandImageIfNeeded(aReanimDef->mReanimAtlas->mMemoryImage.get());
 	}
 }
 
@@ -543,11 +542,15 @@ void BlendTransform(ReanimatorTransform* theResult, const ReanimatorTransform& t
 	theResult->mImage = theTransform1.mImage;
 }
 
-void Reanimation::GetCurrentTransform(int theTrackIndex, ReanimatorTransform* theTransformCurrent)
+void Reanimation::GetCurrentTransform(int theTrackIndex, ReanimatorTransform* theTransformCurrent, ReanimatorFrameTime* theFrameTime)
 {
 	ReanimatorFrameTime aFrameTime;
-	GetFrameTime(&aFrameTime);
-	GetTransformAtTime(theTrackIndex, theTransformCurrent, &aFrameTime);  // base transform interpolated between the two frames
+	if (theFrameTime == nullptr)
+	{
+		GetFrameTime(&aFrameTime);
+		theFrameTime = &aFrameTime;
+	}
+	GetTransformAtTime(theTrackIndex, theTransformCurrent, theFrameTime);  // base transform interpolated between the two frames
 
 	ReanimatorTrackInstance* aTrack = &mTrackInstances[theTrackIndex];
 	if (FloatRoundToInt(theTransformCurrent->mFrame) >= 0 && aTrack->mBlendCounter > 0)  // not a blank frame and a blend is in progress
@@ -632,12 +635,11 @@ void Reanimation::ReanimBltMatrix(Graphics* g, Image* theImage, SexyMatrix3& the
 		PvzpBltMatrix(g, theImage, theTransform, theClipRect, theColor, theDrawMode, theSrcRect);
 }
 
-bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, PvzpTriangleGroup* theTriangleGroup)
+bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int theRenderGroup, PvzpTriangleGroup* theTriangleGroup, ReanimatorFrameTime* theFrameTime)
 {
-	(void)theRenderGroup;
 	ReanimatorTransform aTransform;
 	ReanimatorTrackInstance* aTrackInstance = &mTrackInstances[theTrackIndex];
-	GetCurrentTransform(theTrackIndex, &aTransform);
+	GetCurrentTransform(theTrackIndex, &aTransform, theFrameTime);
 	int aImageFrame = FloatRoundToInt(aTransform.mFrame);  // cel index within the image
 	if (aImageFrame < 0)  // no image to draw
 		return false;
@@ -753,7 +755,7 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, 
 	if (aAtlasImage != nullptr)  // atlas exists, the frame has an image, and no override is set
 	{
 		Rect aSrcRect(aAtlasImage->mX, aAtlasImage->mY, aAtlasImage->mWidth, aAtlasImage->mHeight);
-		aImage = mDefinition->mReanimAtlas->mMemoryImage;
+		aImage = mDefinition->mReanimAtlas->mMemoryImage.get();
 		if (mFilterEffect != FilterEffect::FILTER_EFFECT_NONE)
 		{
 			aImage = FilterEffectGetImage(aImage, mFilterEffect);
@@ -918,14 +920,18 @@ void Reanimation::DrawRenderGroup(Graphics* g, int theRenderGroup)
 {
 	if (mDead)
 		return;
+	if (mDefinition->mTracks.count == 0)
+		return;
 
 	PvzpTriangleGroup aTriangleGroup;
+	ReanimatorFrameTime aFrameTime;
+	GetFrameTime(&aFrameTime);
 	for (int aTrackIndex = 0; aTrackIndex < mDefinition->mTracks.count; aTrackIndex++)
 	{
 		ReanimatorTrackInstance* aTrackInstance = &mTrackInstances[aTrackIndex];
 		if (aTrackInstance->mRenderGroup == theRenderGroup)
 		{
-			bool aTrackDrawn = DrawTrack(g, aTrackIndex, theRenderGroup, &aTriangleGroup);
+			bool aTrackDrawn = DrawTrack(g, aTrackIndex, theRenderGroup, &aTriangleGroup, &aFrameTime);
 			if (aTrackInstance->mAttachmentID != AttachmentID::ATTACHMENTID_NULL)
 			{
 				aTriangleGroup.DrawGroup(g);
@@ -953,7 +959,7 @@ int Reanimation::FindTrackIndex(const char* theTrackName)
 		if (strcasecmp(mDefinition->mTracks.tracks[aTrackIndex].mName, theTrackName) == 0)
 			return aTrackIndex;
 
-	PvzpTrace("Can't find track '%s'", theTrackName);
+	PvzpLogLn("Can't find track '{}'", theTrackName);
 	return 0;
 }
 
@@ -1166,7 +1172,7 @@ void ReanimatorEnsureDefinitionLoaded(ReanimationType theReanimType, bool theIsP
 	if (aReanimDef->mTracks.tracks != nullptr)  // non-null tracks means the definition is already loaded
 		return;
 	const ReanimationParams* aReanimParams = &gReanimationParamArray[theReanimType];
-	PvzpTrace("'%s'\n", aReanimParams->mReanimFileName);
+	PvzpLogLn("'{}'", aReanimParams->mReanimFileName);
 	if (theIsPreloading)
 	{
 		if (gSexyAppBase->mShutdown || LawnGetCloseRequest())  // abort preloading when the app is shutting down
@@ -1175,23 +1181,21 @@ void ReanimatorEnsureDefinitionLoaded(ReanimationType theReanimType, bool theIsP
 	else
 	{
 		if (LawnHasUsedCheatKeys())
-			PvzpTraceAndLogLn("Cheater failed to preload '%s' on %s", aReanimParams->mReanimFileName, LawnGetCurrentLevelName().c_str());
+			PvzpLogLn("Cheater failed to preload '{}' on {}", aReanimParams->mReanimFileName, LawnGetCurrentLevelName());
 		else
-			PvzpTraceAndLogLn("Non-cheater failed to preload '%s' on %s", aReanimParams->mReanimFileName, LawnGetCurrentLevelName().c_str());
+			PvzpLogLn("Non-cheater failed to preload '{}' on {}", aReanimParams->mReanimFileName, LawnGetCurrentLevelName());
 	}
 
 	PerfTimer aTimer;
 	aTimer.Start();
-	PvzpHesitationBracket aHesitation("Load Reanim '%s'", aReanimParams->mReanimFileName);
+	PvzpHesitationBracket aHesitation("Load Reanim '{}'", aReanimParams->mReanimFileName);
 	if (!ReanimationLoadDefinition(aReanimParams->mReanimFileName, aReanimDef))
 	{
-		char aBuf[1024];
-		snprintf(aBuf, sizeof(aBuf), "Failed to load reanim '%s'", aReanimParams->mReanimFileName);
-		PvzpErrorMessageBox(aBuf, "Error");
+		PvzpErrorMessageBox(std::format("Failed to load reanim '{}'", aReanimParams->mReanimFileName), "Error");
 	}
 	int aDuration = aTimer.GetDuration();
 	if (aDuration > 100)  // report slow reanim loading
-		PvzpTraceAndLogLn("LOADING:Long reanim '%s' %d ms on %s", aReanimParams->mReanimFileName, aDuration, LawnGetCurrentLevelName().c_str());
+		PvzpLogLn("LOADING:Long reanim '{}' {} ms on {}", aReanimParams->mReanimFileName, aDuration, LawnGetCurrentLevelName());
 }
 
 void ReanimatorLoadDefinitions(const ReanimationParams* theReanimationParamArray, int theReanimationParamArraySize)
@@ -1201,7 +1205,7 @@ void ReanimatorLoadDefinitions(const ReanimationParams* theReanimationParamArray
 	gReanimationParamArraySize = theReanimationParamArraySize;
 	gReanimationParamArray = theReanimationParamArray;
 	gReanimatorDefCount = theReanimationParamArraySize;
-	gReanimatorDefArray = new ReanimatorDefinition[theReanimationParamArraySize];
+	gReanimatorDefArray = std::make_unique<ReanimatorDefinition[]>(theReanimationParamArraySize);
 
 #ifndef LOW_MEMORY
 	for (unsigned int i = 0; i < gReanimationParamArraySize; i++)
@@ -1219,8 +1223,7 @@ void ReanimatorFreeDefinitions()
 	for (unsigned int i = 0; i < gReanimatorDefCount; i++)
 		ReanimationFreeDefinition(&gReanimatorDefArray[i]);
 
-	delete[] gReanimatorDefArray;
-	gReanimatorDefArray = nullptr;
+	gReanimatorDefArray.reset();
 	gReanimatorDefCount = 0;
 	gReanimationParamArray = nullptr;
 	gReanimationParamArraySize = 0;
@@ -1359,9 +1362,8 @@ void Reanimation::ParseAttacherTrack(const ReanimatorTransform& theTransform, At
 	}
 }
 
-void Reanimation::AttacherSynchWalkSpeed(int theTrackIndex, Reanimation* theAttachReanim, AttacherInfo& theAttacherInfo)
+void Reanimation::AttacherSynchWalkSpeed(int theTrackIndex, Reanimation* theAttachReanim, [[maybe_unused]] AttacherInfo& theAttacherInfo)
 {
-	(void)theAttacherInfo;
 	ReanimatorTrack* aTrack = &mDefinition->mTracks.tracks[theTrackIndex];
 	ReanimatorFrameTime aFrameTime;
 	GetFrameTime(&aFrameTime);
@@ -1423,7 +1425,7 @@ void Reanimation::UpdateAttacherTrack(int theTrackIndex)
 	ReanimationType aReanimationType = ReanimationType::REANIM_NONE;
 	if (aAttacherInfo.mReanimName.size() != 0)
 	{
-		std::string aReanimFileName = StrFormat("reanim/%s.reanim", aAttacherInfo.mReanimName.c_str());
+		std::string aReanimFileName = std::format("reanim/{}.reanim", aAttacherInfo.mReanimName);
 		for (unsigned int i = 0; i < gReanimationParamArraySize; i++)  // find the reanim type for this file name
 		{
 			const ReanimationParams* aParams = &gReanimationParamArray[i];

@@ -29,6 +29,7 @@
 #include "../PvzpLib/Reanimator.h"
 #include "../PvzpLib/PvzpStringFile.h"
 #include <algorithm>
+#include <SDL.h>
 
 MessageWidget::MessageWidget(LawnApp* theApp)
 {
@@ -102,19 +103,19 @@ static void TruncateLabel(std::string& theLabel)
 
 void MessageWidget::SetLabel(std::string_view theNewLabel, MessageStyle theMessageStyle)
 {
-	std::string aLabel = PvzpStringTranslate(theNewLabel);
+	std::string aLabel(PvzpStringTranslate(theNewLabel));
 	TruncateLabel(aLabel);
 
 	if (mReanimType != ReanimationType::REANIM_NONE && mDuration > 0)
 	{
 		mMessageStyleNext = theMessageStyle;
-		strcpy(mLabelNext, aLabel.c_str());
+		SDL_strlcpy(mLabelNext, aLabel.c_str(), sizeof(mLabelNext));
 		ClearLabel();
 	}
 	else
 	{
 		ClearReanim();
-		strcpy(mLabel, aLabel.c_str());
+		SDL_strlcpy(mLabel, aLabel.c_str(), sizeof(mLabel));
 		mMessageStyle = theMessageStyle;
 		mReanimType = ReanimationType::REANIM_NONE;
 

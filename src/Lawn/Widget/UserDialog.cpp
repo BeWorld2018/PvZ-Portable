@@ -28,20 +28,21 @@
 #include "../../PvzpLib/PvzpStringFile.h"
 #include "widget/ListWidget.h"
 
-static int gUserListWidgetColors[][3] = {
-	{  23,  24,  35 },
-	{   0,   0,   0 },
-	{ 235, 225, 180 },
-	{ 255, 255, 255 },
-	{  20, 180,  15 }
+static constexpr ListWidgetColorScheme gUserListWidgetColors{
+	.mBkg = Color(23, 24, 35),
+	.mOutline = Color(0, 0, 0),
+	.mText = Color(235, 225, 180),
+	.mHilite = Color(255, 255, 255),
+	.mSelect = Color(20, 180, 15),
+	.mSelectText = std::nullopt,
 };
 
 // these dialogs don't have localizations
 UserDialog::UserDialog(LawnApp* theApp) : LawnDialog(theApp, Dialogs::DIALOG_USERDIALOG, true, theApp->GetString("WHO_ARE_YOU", "WHO ARE YOU?"), "", "", Dialog::BUTTONS_OK_CANCEL)
 {
 	mVerticalCenterText = false;
-	mUserList = new ListWidget(0, FONT_BRIANNETOD16, this);
-	mUserList->SetColors(gUserListWidgetColors, LENGTH(gUserListWidgetColors));
+	mUserList = std::make_unique<ListWidget>(0, FONT_BRIANNETOD16, this);
+	mUserList->SetColors(gUserListWidgetColors);
 	mUserList->mDrawOutline = true;
 	mUserList->mJustify = ListWidget::JUSTIFY_CENTER;
 	mUserList->mItemHeight = 24;
@@ -77,19 +78,14 @@ UserDialog::UserDialog(LawnApp* theApp) : LawnDialog(theApp, Dialogs::DIALOG_USE
 	CalcSize(210, 270);
 }
 
-UserDialog::~UserDialog()
-{
-	delete mUserList;
-	delete mRenameButton;
-	delete mDeleteButton;
-}
+UserDialog::~UserDialog() = default;
 
 void UserDialog::Resize(int theX, int theY, int theWidth, int theHeight)
 {
 	LawnDialog::Resize(theX, theY, theWidth, theHeight);
 	mUserList->Resize(GetLeft() + 30, GetTop() + 4, GetWidth() - 60, 200);
-	mRenameButton->Layout(LayoutFlags::LAY_SameLeft | LayoutFlags::LAY_Above | LayoutFlags::LAY_SameHeight | LayoutFlags::LAY_SameWidth, mLawnYesButton, 0, 0, 0, 0);
-	mDeleteButton->Layout(LayoutFlags::LAY_SameLeft | LayoutFlags::LAY_Above | LayoutFlags::LAY_SameHeight | LayoutFlags::LAY_SameWidth, mLawnNoButton, 0, 0, 0, 0);
+	mRenameButton->Layout(LayoutFlags::LAY_SameLeft | LayoutFlags::LAY_Above | LayoutFlags::LAY_SameHeight | LayoutFlags::LAY_SameWidth, mLawnYesButton.get(), 0, 0, 0, 0);
+	mDeleteButton->Layout(LayoutFlags::LAY_SameLeft | LayoutFlags::LAY_Above | LayoutFlags::LAY_SameHeight | LayoutFlags::LAY_SameWidth, mLawnNoButton.get(), 0, 0, 0, 0);
 }
 
 int UserDialog::GetPreferredHeight(int theWidth)
@@ -100,17 +96,17 @@ int UserDialog::GetPreferredHeight(int theWidth)
 void UserDialog::AddedToManager(WidgetManager* theWidgetManager)
 {
 	LawnDialog::AddedToManager(theWidgetManager);
-	AddWidget(mUserList);
-	AddWidget(mDeleteButton);
-	AddWidget(mRenameButton);
+	AddWidget(mUserList.get());
+	AddWidget(mDeleteButton.get());
+	AddWidget(mRenameButton.get());
 }
 
 void UserDialog::RemovedFromManager(WidgetManager* theWidgetManager)
 {
 	LawnDialog::RemovedFromManager(theWidgetManager);
-	RemoveWidget(mUserList);
-	RemoveWidget(mDeleteButton);
-	RemoveWidget(mRenameButton);
+	RemoveWidget(mUserList.get());
+	RemoveWidget(mDeleteButton.get());
+	RemoveWidget(mRenameButton.get());
 }
 
 std::string UserDialog::GetSelName()
@@ -154,9 +150,8 @@ void UserDialog::Draw(Graphics* g)
 	LawnDialog::Draw(g);
 }
 
-void UserDialog::ListClicked(int theId, int theIdx, int theClickCount)
+void UserDialog::ListClicked([[maybe_unused]] int theId, int theIdx, int theClickCount)
 {
-	(void)theId;
 	if (theIdx == mNumUsers)
 	{
 		mApp->DoCreateUserDialog();
@@ -190,14 +185,12 @@ void UserDialog::ButtonDepress(int theId)
 	}
 }
 
-void UserDialog::EditWidgetText(int theId, const std::string& theString)
+void UserDialog::EditWidgetText([[maybe_unused]] int theId, [[maybe_unused]] const std::string& theString)
 {
-	(void)theId;(void)theString;
 	mApp->ButtonDepress(mId + 2000);
 }
 
-bool UserDialog::AllowChar(int theId, char theChar)
+bool UserDialog::AllowChar([[maybe_unused]] int theId, char theChar)
 {
-	(void)theId;
 	return isdigit(theChar);
 }

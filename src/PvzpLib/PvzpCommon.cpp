@@ -333,29 +333,6 @@ float PvzpCurveInvCircle(float theTime)
 	return static_cast<float>(sqrt(1.0f - (theTime - 1.0f) * (theTime - 1.0f)));
 }
 
-float PvzpCurveEvaluate(float theTime, float thePositionStart, float thePositionEnd, PvzpCurves theCurve)
-{
-	float aWarpedTime = 0;
-	switch (theCurve)
-	{
-	case PvzpCurves::CURVE_CONSTANT:				aWarpedTime = 0;													break;
-	case PvzpCurves::CURVE_LINEAR:				aWarpedTime = theTime;												break;
-	case PvzpCurves::CURVE_EASE_IN:				aWarpedTime = PvzpCurveQuad(theTime);								break;
-	case PvzpCurves::CURVE_EASE_OUT:				aWarpedTime = PvzpCurveInvQuad(theTime);								break;
-	case PvzpCurves::CURVE_EASE_IN_OUT:			aWarpedTime = PvzpCurveS(PvzpCurveS(theTime));						break;
-	case PvzpCurves::CURVE_EASE_IN_OUT_WEAK:		aWarpedTime = PvzpCurveS(theTime);									break;
-	case PvzpCurves::CURVE_FAST_IN_OUT:			aWarpedTime = PvzpCurveInvQuadS(PvzpCurveInvQuadS(theTime));			break;
-	case PvzpCurves::CURVE_FAST_IN_OUT_WEAK:		aWarpedTime = PvzpCurveInvQuadS(theTime);							break;
-	case PvzpCurves::CURVE_BOUNCE:				aWarpedTime = PvzpCurveBounce(theTime);								break;
-	case PvzpCurves::CURVE_BOUNCE_FAST_MIDDLE:	aWarpedTime = PvzpCurveQuad(PvzpCurveBounce(theTime));				break;
-	case PvzpCurves::CURVE_BOUNCE_SLOW_MIDDLE:	aWarpedTime = PvzpCurveInvQuad(PvzpCurveBounce(theTime));				break;
-	case PvzpCurves::CURVE_SIN_WAVE:				aWarpedTime = sinf(2 * PI * theTime);								break;
-	case PvzpCurves::CURVE_EASE_SIN_WAVE:		aWarpedTime = sinf(2 * PI * PvzpCurveS(theTime));					break;
-	default:									PVZP_ASSERT(false);														break;
-	}
-	return (thePositionEnd - thePositionStart) * aWarpedTime + thePositionStart;
-}
-
 float PvzpCurveEvaluateClamped(float theTime, float thePositionStart, float thePositionEnd, PvzpCurves theCurve)
 {
 	if (theTime <= 0.0f)
@@ -415,7 +392,7 @@ float RandRangeFloat(float theMin, float theMax)
 
 void PvzpDrawString(Graphics* g, std::string_view theText, int thePosX, int thePosY, _Font* theFont, const Color& theColor, DrawStringJustification theJustification)
 {
-	std::string aFinalString = PvzpStringTranslate(theText);
+	std::string_view aFinalString = PvzpStringTranslate(theText);
 
 	int aPosX = thePosX;
 	if (theJustification == DrawStringJustification::DS_ALIGN_RIGHT || theJustification == DrawStringJustification::DS_ALIGN_RIGHT_VERTICAL_MIDDLE)
@@ -449,7 +426,7 @@ static RenderCommand* gRenderHead[256];
 
 void PvzpDrawStringMatrix(Graphics* g, const _Font* theFont, const SexyMatrix3& theMatrix, std::string_view theString, const Color& theColor)
 {
-	std::string aFinalString = PvzpStringTranslate(theString);
+	std::string_view aFinalString = PvzpStringTranslate(theString);
 
 	memset(gRenderTail, 0, sizeof(gRenderTail));
 	memset(gRenderHead, 0, sizeof(gRenderHead));
@@ -897,7 +874,7 @@ void FixPixelsOnAlphaEdgeForBlending(Image* theImage)
 	PerfTimer aTimer;
 	aTimer.Start();
 
-	uint32_t* aBitsPtr = aImage->mBits;
+	uint32_t* aBitsPtr = aImage->mBits.get();
 	for (int y = 0; y < theImage->mHeight; y++)
 	{
 		for (int x = 0; x < theImage->mWidth; x++)
@@ -915,7 +892,7 @@ void FixPixelsOnAlphaEdgeForBlending(Image* theImage)
 	int aDuration = std::max(aTimer.GetDuration(), 0.0);
 	if (aDuration > 20)
 	{
-		PvzpTraceAndLogLn("LOADING:Long sanding '%s' %d ms on %s", theImage->mFilePath.c_str(), aDuration, LawnGetCurrentLevelName().c_str());
+		PvzpLogLn("LOADING:Long sanding '{}' {} ms on {}", theImage->mFilePath, aDuration, LawnGetCurrentLevelName());
 	}
 }
 
@@ -1026,7 +1003,7 @@ Color ColorsMultiply(const Color& theColor1, const Color& theColor2)
 
 bool PvzpLoadResources(const std::string& theGroup)
 {
-	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager)->PvzpLoadResources(theGroup);
+	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager.get())->PvzpLoadResources(theGroup);
 }
 
 bool PvzpResourceManager::PvzpLoadResources(const std::string& theGroup)
@@ -1059,7 +1036,7 @@ bool PvzpResourceManager::PvzpLoadResources(const std::string& theGroup)
 	int aDuration = std::max(aTimer.GetDuration(), 0.0);
 	if (aDuration > 20)
 	{
-		PvzpTraceAndLogLn("LOADED: '%s' %d ms on %s", theGroup.c_str(), aDuration, LawnGetCurrentLevelName().c_str());
+		PvzpLogLn("LOADED: '{}' {} ms on {}", theGroup, aDuration, LawnGetCurrentLevelName());
 	}
 
 	return true;
@@ -1067,28 +1044,26 @@ bool PvzpResourceManager::PvzpLoadResources(const std::string& theGroup)
 
 void PvzpAddImageToMap(SharedImageRef* theImage, const std::string& thePath)
 {
-	static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager)->AddImageToMap(theImage, thePath);
+	static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager.get())->AddImageToMap(theImage, thePath);
 }
 
 void PvzpResourceManager::AddImageToMap(SharedImageRef* theImage, const std::string& thePath)
 {
 	PVZP_ASSERT(mImageMap.find(thePath) == mImageMap.end());
 
-	ImageRes* aImageRes = new ImageRes();
+	auto aImageRes = std::make_unique<ImageRes>();
 	aImageRes->mImage = *theImage;
 	aImageRes->mPath = thePath;
-	mImageMap.insert(ResMap::value_type(thePath, aImageRes));
+	mImageMap.insert(ResMap::value_type(thePath, std::move(aImageRes)));
 }
 
 bool PvzpLoadNextResource()
 {
-	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager)->PvzpLoadNextResource();
+	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager.get())->PvzpLoadNextResource();
 }
 
 bool PvzpResourceManager::PvzpLoadNextResource()
 {
-	PvzpHesitationTrace("preres");
-
 	while (mCurResGroupListItr != mCurResGroupList->end())
 	{
 		BaseRes* aRes = *mCurResGroupListItr;
@@ -1150,8 +1125,6 @@ bool PvzpResourceManager::PvzpLoadNextResource()
 			}
 		}
 
-		PvzpHesitationTrace("Loading: '%s'", aRes->mPath.c_str());
-		PvzpHesitationTrace("resource '%s'", aRes->mPath.c_str());
 		return true;
 	}
 
@@ -1160,19 +1133,19 @@ bool PvzpResourceManager::PvzpLoadNextResource()
 
 bool PvzpFindImagePath(Image* theImage, std::string* thePath)
 {
-	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager)->FindImagePath(theImage, thePath);
+	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager.get())->FindImagePath(theImage, thePath);
 }
 
 bool PvzpFindFontPath(_Font* theFont, std::string* thePath) {
-	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager)->FindFontPath(theFont, thePath);
+	return static_cast<PvzpResourceManager*>(gSexyAppBase->mResourceManager.get())->FindFontPath(theFont, thePath);
 }
 
 bool PvzpResourceManager::FindFontPath(_Font* theFont, std::string* thePath)
 {
 	for (auto anItr = mFontMap.begin(); anItr != mFontMap.end(); anItr++)
 	{
-		FontRes* aFontRes = (FontRes*)anItr->second;
-		_Font* aFont = (_Font*)aFontRes->mFont;
+		FontRes* aFontRes = (FontRes*)anItr->second.get();
+		_Font* aFont = (_Font*)aFontRes->mFont.get();
 		if (aFont == theFont)
 		{
 			*thePath = anItr->first;
@@ -1186,7 +1159,7 @@ bool PvzpResourceManager::FindImagePath(Image* theImage, std::string* thePath)
 {
 	for (auto anItr = mImageMap.begin(); anItr != mImageMap.end(); anItr++)
 	{
-		ImageRes* aImageRes = (ImageRes*)anItr->second;
+		ImageRes* aImageRes = (ImageRes*)anItr->second.get();
 		Image* aImage = (Image*)aImageRes->mImage;
 		if (aImage == theImage)
 		{
@@ -1229,11 +1202,11 @@ void FreeGlobalAllocators()
 
 std::string PvzpReplaceString(std::string_view theText, const char* theStringToFind, std::string_view theStringToSubstitute)
 {
-	std::string aFinalString = PvzpStringTranslate(theText);
+	std::string aFinalString(PvzpStringTranslate(theText));
 	size_t aPos = aFinalString.find(theStringToFind);
 	if (aPos != std::string::npos)
 	{
-		std::string aFinalStringToSubstitute = PvzpStringTranslate(theStringToSubstitute);
+		std::string aFinalStringToSubstitute(PvzpStringTranslate(theStringToSubstitute));
 		aFinalString.replace(aPos, strlen(theStringToFind), aFinalStringToSubstitute);
 	}
 
@@ -1242,11 +1215,11 @@ std::string PvzpReplaceString(std::string_view theText, const char* theStringToF
 
 std::string PvzpReplaceNumberString(std::string_view theText, const char* theStringToFind, int theNumber)
 {
-	std::string aFinalString = PvzpStringTranslate(theText);
+	std::string aFinalString(PvzpStringTranslate(theText));
 	size_t aPos = aFinalString.find(theStringToFind);
 	if (aPos != std::string::npos)
 	{
-		std::string aNumberString = StrFormat("%d", theNumber);
+		std::string aNumberString = std::to_string(theNumber);
 		aFinalString.replace(aPos, strlen(theStringToFind), aNumberString);
 	}
 
@@ -1268,33 +1241,4 @@ bool PvzpIsPointInPolygon(const SexyVector2* thePolygonPoint, int theNumberPolyg
 			return false;
 	}
 	return true;
-}
-
-int PvzpVsnprintf(char* theBuffer, int theSize, const char* theFormat, va_list theArgList)
-{
-	try
-	{
-		int aCount = vsnprintf(theBuffer, theSize, theFormat, theArgList);
-		if (aCount == -1)
-		{
-			theBuffer[theSize - 1] = '\0';
-			aCount = theSize - 1;
-		}
-		return aCount;
-	}
-	catch (std::exception&)
-	{
-		PVZP_ASSERT(, "bad format string");
-		return 1;
-	}
-}
-
-int PvzpSnprintf(char* theBuffer, int theSize, const char* theFormat, ...)
-{
-	va_list argList;
-	va_start(argList, theFormat);
-	int aCount = PvzpVsnprintf(theBuffer, theSize, theFormat, argList);
-	va_end(argList);
-
-	return aCount;
 }

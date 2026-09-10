@@ -58,7 +58,7 @@ TitleScreen::TitleScreen(LawnApp* theApp)
 	mTitleStateCounter = 0;
 	mLoaderScreenIsLoaded = false;
 
-	mStartButton = new Sexy::HyperlinkWidget(0, this);
+	mStartButton = std::make_unique<Sexy::HyperlinkWidget>(0, this);
 	mStartButton->mColor = Sexy::Color(218, 184, 33);
 	mStartButton->mOverColor = Sexy::Color(250, 90, 15);
 	mStartButton->mUnderlineSize = 0;
@@ -68,11 +68,6 @@ TitleScreen::TitleScreen(LawnApp* theApp)
 
 TitleScreen::~TitleScreen()
 {
-	if (mStartButton)
-	{
-		delete mStartButton;
-	}
-
 #ifdef LOW_MEMORY
 	// Selectively delete only title-screen-specific resources from LoaderBar group.
 	mApp->mResourceManager->DeleteImage("IMAGE_LOADBAR_DIRT");
@@ -98,8 +93,7 @@ void TitleScreen::Draw(Graphics* g)
 
 		if (!mDrawnYet)
 		{
-			PvzpTraceAndLogLn("First Draw Time: %d ms", SDL_GetTicks() - mApp->mTimeLoaded);
-			PvzpHesitationTrace("TitleScreen First Draw");
+			PvzpLogLn("First Draw Time: {} ms", SDL_GetTicks() - mApp->mTimeLoaded);
 			mDrawnYet = true;
 		}
 
@@ -182,7 +176,7 @@ void TitleScreen::Draw(Graphics* g)
 	int aGrassX = mStartButton->mX;
 	int aGrassY = mStartButton->mY - 17;
 
-	//Sexy::PrintF("%d %d\n", aGrassX, aGrassY);
+	//Sexy::LogInfoLn("{} {}\n", aGrassX, aGrassY);
 	g->DrawImage(IMAGE_LOADBAR_DIRT, aGrassX, aGrassY + 18);
 
 	if (mCurBarWidth >= mTotalBarWidth)
@@ -389,7 +383,7 @@ void TitleScreen::Update()
 		mPrevLoadingPercent = aLoadingPercent;
 	}
 
-	if (!mLoadingThreadComplete && (mApp->IsInDemoMode() ? mApp->mLoaded : mApp->mLoadingThreadCompleted))
+	if (!mLoadingThreadComplete && (mApp->IsInDemoMode() ? mApp->mLoaded : mApp->mLoadingThreadCompleted.load()))
 	{
 		mLoadingThreadComplete = true;
 		mStartButton->SetDisabled(false);
@@ -506,18 +500,17 @@ void TitleScreen::Resize(int theX, int theY, int theWidth, int theHeight)
 void TitleScreen::AddedToManager(Sexy::WidgetManager* theWidgetManager)
 {
 	Widget::AddedToManager(theWidgetManager);
-	theWidgetManager->AddWidget(mStartButton);
+	theWidgetManager->AddWidget(mStartButton.get());
 }
 
 void TitleScreen::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
 {
 	Widget::RemovedFromManager(theWidgetManager);
-	theWidgetManager->RemoveWidget(mStartButton);
+	theWidgetManager->RemoveWidget(mStartButton.get());
 }
 
-void TitleScreen::ButtonPress(int theId)
+void TitleScreen::ButtonPress([[maybe_unused]] int theId)
 {
-	(void)theId;
 	mApp->PlaySample(Sexy::SOUND_BUTTONCLICK);
 }
 
@@ -535,9 +528,8 @@ void TitleScreen::ButtonDepress(int theId)
 	}
 }
 
-void TitleScreen::MouseDown(int x, int y, int theClickCount)
+void TitleScreen::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int theClickCount)
 {
-	(void)x;(void)y;(void)theClickCount;
 	if (mLoadingThreadComplete)
 	{
 		mApp->PlaySample(Sexy::SOUND_BUTTONCLICK);

@@ -34,6 +34,8 @@ void RGB_to_HSL(float r, float g, float b, float& h, float& s, float& l)
 	minval = std::min(minval, b);
 
 	l = (minval + maxval) / 2;  //luminosity
+	h = 0.0f;
+	s = 0.0f;
 	if (l <= 0.0f)
 		return;
 
@@ -97,20 +99,13 @@ void FilterEffectDisposeForApp()
 	{
 		ImageFilterMap& aFilterMap = gFilterMap[i];
 
-		for (ImageFilterMap::iterator it = aFilterMap.begin(); it != aFilterMap.end(); it++)
-		{
-			Image* aImage = it->second;
-			if (aImage != nullptr)
-				delete aImage;
-		}
-
 		aFilterMap.clear();
 	}
 }
 
 void FilterEffectDoLumSat(MemoryImage* theImage, float theLum, float theSat)
 {
-	uint32_t* ptr = theImage->mBits;
+	uint32_t* ptr = theImage->mBits.get();
 	for (int y = 0; y < theImage->mHeight; y++)
 	{
 		for (int x = 0; x < theImage->mWidth; x++)
@@ -144,7 +139,7 @@ void FilterEffectDoLessWashedOut(MemoryImage* theImage)
 
 void FilterEffectDoWhite(MemoryImage* theImage)
 {
-	uint32_t* ptr = theImage->mBits;
+	uint32_t* ptr = theImage->mBits.get();
 	for (int y = 0; y < theImage->mHeight; y++)
 		for (int x = 0; x < theImage->mWidth; x++)
 			*ptr++ |= 0x00FFFFFF;
@@ -156,10 +151,10 @@ MemoryImage* FilterEffectCreateImage(Image* theImage, FilterEffect theFilterEffe
 	aImage->mWidth = theImage->mWidth;
 	aImage->mHeight = theImage->mHeight;
 	int aNumBits = theImage->mWidth * theImage->mHeight;
-	aImage->mBits = new uint32_t[aNumBits + 1];
+	aImage->mBits = std::make_unique<uint32_t[]>(aNumBits + 1);
 	aImage->mHasTrans = true;
 	aImage->mHasAlpha = true;
-	memset(aImage->mBits, 0, aNumBits * 4);
+	memset(aImage->mBits.get(), 0, aNumBits * 4);
 	aImage->mBits[aNumBits] = Sexy::MEMORYCHECK_ID;
 
 	Graphics aMemoryGraphics(aImage);
@@ -189,7 +184,7 @@ Image* FilterEffectGetImage(Image* theImage, FilterEffect theFilterEffect)
 	ImageFilterMap& aFilterMap = gFilterMap[theFilterEffect];
 	ImageFilterMap::iterator it = aFilterMap.find(theImage);
 	if (it != aFilterMap.end())
-		return it->second;
+		return it->second.get();
 
 	MemoryImage* aImage = FilterEffectCreateImage(theImage, theFilterEffect);
 	aFilterMap.insert(ImageFilterMap::value_type(theImage, aImage));

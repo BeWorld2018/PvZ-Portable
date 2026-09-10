@@ -58,24 +58,10 @@ MemoryImage::MemoryImage(SexyAppBase* theApp)
 MemoryImage::~MemoryImage()
 {
 	mApp->RemoveMemoryImage(this);
-
-	delete [] mBits;
-	delete [] mNativeAlphaData;
-	delete [] mRLAlphaData;
-	delete [] mRLAdditiveData;
-	delete [] mColorIndices;
-	delete [] mColorTable;
 }
 
 void MemoryImage::Init()
 {
-	mBits = nullptr;
-	mColorTable = nullptr;
-	mColorIndices = nullptr;
-
-	mNativeAlphaData = nullptr;
-	mRLAlphaData = nullptr;
-	mRLAdditiveData = nullptr;
 	mHasTrans = false;
 	mHasAlpha = false;
 	mBitsChanged = false;
@@ -97,14 +83,9 @@ void MemoryImage::BitsChanged()
 	mBitsChanged = true;
 	mBitsChangedCount++;
 
-	delete [] mNativeAlphaData;
-	mNativeAlphaData = nullptr;
-
-	delete [] mRLAlphaData;
-	mRLAlphaData = nullptr;
-
-	delete [] mRLAdditiveData;
-	mRLAdditiveData = nullptr;
+	mNativeAlphaData.reset();
+	mRLAlphaData.reset();
+	mRLAdditiveData.reset();
 
 	// Verify secret value at end to protect against overwrite
 	if (mBits != nullptr)
@@ -733,7 +714,7 @@ void MemoryImage::CommitBits()
 			mHasAlpha = false;
 
 			int aSize = mWidth*mHeight;
-			uint32_t* ptr = mBits;
+			uint32_t* ptr = mBits.get();
 
 			for (int i = 0; i < aSize; i++)
 			{
@@ -751,7 +732,7 @@ void MemoryImage::CommitBits()
 			mHasAlpha = false;
 
 			int aSize = 256;
-			uint32_t* ptr = mColorTable;
+			uint32_t* ptr = mColorTable.get();
 
 			for (int i = 0; i < aSize; i++)
 			{
@@ -791,7 +772,7 @@ void MemoryImage::SetVolatile(bool isVolatile)
 void* MemoryImage::GetNativeAlphaData(NativeDisplay *theDisplay)
 {
 	if (mNativeAlphaData != nullptr)
-		return mNativeAlphaData;
+		return mNativeAlphaData.get();
 
 	CommitBits();
 
@@ -832,11 +813,11 @@ void* MemoryImage::GetNativeAlphaData(NativeDisplay *theDisplay)
 				(anAlpha << 24);
 		}
 
-		mNativeAlphaData = anAlphaData;
+		mNativeAlphaData.reset(anAlphaData);
 	}
 	else
 	{
-		uint32_t* aSrcPtr = mColorTable;
+		uint32_t* aSrcPtr = mColorTable.get();
 
 		uint32_t* anAlphaData = new uint32_t[256];
 
@@ -858,10 +839,10 @@ void* MemoryImage::GetNativeAlphaData(NativeDisplay *theDisplay)
 		}
 
 
-		mNativeAlphaData = anAlphaData;
+		mNativeAlphaData.reset(anAlphaData);
 	}
 
-	return mNativeAlphaData;
+	return mNativeAlphaData.get();
 }
 
 
@@ -871,13 +852,13 @@ uchar* MemoryImage::GetRLAlphaData()
 
 	if (mRLAlphaData == nullptr)
 	{
-		mRLAlphaData = new uchar[mWidth*mHeight];
+		mRLAlphaData = std::make_unique<uchar[]>(mWidth*mHeight);
 
 		if (mColorTable == nullptr)
 		{
 			uint32_t* aSrcPtr;
 			if (mNativeAlphaData != nullptr)
-				aSrcPtr = (uint32_t*) mNativeAlphaData;
+				aSrcPtr = (uint32_t*) mNativeAlphaData.get();
 			else
 				aSrcPtr = GetBits();
 
@@ -889,8 +870,8 @@ uchar* MemoryImage::GetRLAlphaData()
 		}
 		else
 		{
-			uchar* aSrcPtr = mColorIndices;
-			uint32_t* aColorTable = mColorTable;
+			uchar* aSrcPtr = mColorIndices.get();
+			uint32_t* aColorTable = mColorTable.get();
 
 			#define NEXT_SRC_COLOR (aColorTable[*(aSrcPtr++)])
 
@@ -900,7 +881,7 @@ uchar* MemoryImage::GetRLAlphaData()
 		}
 	}
 
-	return mRLAlphaData;
+	return mRLAlphaData.get();
 }
 
 uchar* MemoryImage::GetRLAdditiveData(NativeDisplay *theNative)
@@ -911,9 +892,9 @@ uchar* MemoryImage::GetRLAdditiveData(NativeDisplay *theNative)
 		{
 			uint32_t* aBits = (uint32_t*) GetNativeAlphaData(theNative);
 
-			mRLAdditiveData = new uchar[mWidth*mHeight];
+			mRLAdditiveData = std::make_unique<uchar[]>(mWidth*mHeight);
 
-			uchar* aWPtr = mRLAdditiveData;
+			uchar* aWPtr = mRLAdditiveData.get();
 			uint32_t* aRPtr = aBits;
 
 			if (mWidth==1)
@@ -963,10 +944,10 @@ uchar* MemoryImage::GetRLAdditiveData(NativeDisplay *theNative)
 		{
 			uint32_t* aNativeColorTable = (uint32_t*) GetNativeAlphaData(theNative);
 
-			mRLAdditiveData = new uchar[mWidth*mHeight];
+			mRLAdditiveData = std::make_unique<uchar[]>(mWidth*mHeight);
 
-			uchar* aWPtr = mRLAdditiveData;
-			uchar* aRPtr = mColorIndices;
+			uchar* aWPtr = mRLAdditiveData.get();
+			uchar* aRPtr = mColorIndices.get();
 
 			if (mWidth==1)
 			{
@@ -1013,7 +994,7 @@ uchar* MemoryImage::GetRLAdditiveData(NativeDisplay *theNative)
 		}
 	}
 
-	return mRLAdditiveData;
+	return mRLAdditiveData.get();
 }
 
 void MemoryImage::PurgeBits()
@@ -1032,19 +1013,15 @@ void MemoryImage::PurgeBits()
 		if ((mBits == nullptr) && (mColorIndices == nullptr))
 			return;
 
-		GetNativeAlphaData(gSexyAppBase->mGLInterface);
+		GetNativeAlphaData(gSexyAppBase->mGLInterface.get());
 	}
 
-	delete [] mBits;
-	mBits = nullptr;
+	mBits.reset();
 
 	if (mRenderData != nullptr)
 	{
-		delete [] mColorIndices;
-		mColorIndices = nullptr;
-
-		delete [] mColorTable;
-		mColorTable = nullptr;
+		mColorIndices.reset();
+		mColorTable.reset();
 	}
 }
 
@@ -1053,14 +1030,9 @@ void MemoryImage::DeleteSWBuffers()
 	if ((mBits == nullptr) && (mColorIndices == nullptr))
 		GetBits();
 
-	delete [] mNativeAlphaData;
-	mNativeAlphaData = nullptr;
-
-	delete [] mRLAdditiveData;
-	mRLAdditiveData = nullptr;
-
-	delete [] mRLAlphaData;
-	mRLAlphaData = nullptr;
+	mNativeAlphaData.reset();
+	mRLAdditiveData.reset();
+	mRLAlphaData.reset();
 }
 
 void MemoryImage::Delete3DBuffers()
@@ -1089,31 +1061,24 @@ void MemoryImage::DeleteNativeData()
 	if ((mBits == nullptr) && (mColorIndices == nullptr))
 		GetBits(); // We need to keep the bits around
 
-	delete [] mNativeAlphaData;
-	mNativeAlphaData = nullptr;
-
-	delete [] mRLAdditiveData;
-	mRLAdditiveData = nullptr;
+	mNativeAlphaData.reset();
+	mRLAdditiveData.reset();
 }
 
 void MemoryImage::SetBits(uint32_t* theBits, int theWidth, int theHeight, bool commitBits)
 {
-	if (theBits != mBits)
+	if (theBits != mBits.get())
 	{
-		delete [] mColorIndices;
-		mColorIndices = nullptr;
-
-		delete [] mColorTable;
-		mColorTable = nullptr;
+		mColorIndices.reset();
+		mColorTable.reset();
 
 		if (theWidth != mWidth || theHeight != mHeight)
 		{
-			delete [] mBits;
-			mBits = new uint32_t[theWidth*theHeight + 1];
+			mBits = std::make_unique<uint32_t[]>(theWidth*theHeight + 1);
 			mWidth = theWidth;
 			mHeight = theHeight;
 		}
-		memcpy(mBits, theBits, mWidth*mHeight*sizeof(uint32_t));
+		memcpy(mBits.get(), theBits, mWidth*mHeight*sizeof(uint32_t));
 		mBits[mWidth*mHeight] = MEMORYCHECK_ID;
 
 		BitsChanged();
@@ -1124,8 +1089,7 @@ void MemoryImage::SetBits(uint32_t* theBits, int theWidth, int theHeight, bool c
 
 void MemoryImage::Create(int theWidth, int theHeight)
 {
-	delete [] mBits;
-	mBits = nullptr;
+	mBits.reset();
 
 	mWidth = theWidth;
 	mHeight = theHeight;
@@ -1143,7 +1107,7 @@ uint32_t* MemoryImage::GetBits()
 	{
 		int aSize = mWidth*mHeight;
 
-		mBits = new uint32_t[aSize+1];
+		mBits = std::make_unique<uint32_t[]>(aSize+1);
 		mBits[aSize] = MEMORYCHECK_ID;
 
 		if (mColorTable != nullptr)
@@ -1151,18 +1115,13 @@ uint32_t* MemoryImage::GetBits()
 			for (int i = 0; i < aSize; i++)
 				mBits[i] = mColorTable[mColorIndices[i]];
 
-			delete [] mColorIndices;
-			mColorIndices = nullptr;
-
-			delete [] mColorTable;
-			mColorTable = nullptr;
-
-			delete [] mNativeAlphaData;
-			mNativeAlphaData = nullptr;
+			mColorIndices.reset();
+			mColorTable.reset();
+			mNativeAlphaData.reset();
 		}
 		else if (mNativeAlphaData != nullptr)
 		{
-			NativeDisplay* aDisplay = gSexyAppBase->mGLInterface;
+			NativeDisplay* aDisplay = gSexyAppBase->mGLInterface.get();
 
 			const int rMask = aDisplay->mRedMask;
 			const int gMask = aDisplay->mGreenMask;
@@ -1172,8 +1131,8 @@ uint32_t* MemoryImage::GetBits()
 			const int gLeftShift = aDisplay->mGreenShift + (aDisplay->mGreenBits);
 			const int bLeftShift = aDisplay->mBlueShift + (aDisplay->mBlueBits);
 
-			uint32_t* aDestPtr = mBits;
-			uint32_t* aSrcPtr = mNativeAlphaData;
+			uint32_t* aDestPtr = mBits.get();
+			uint32_t* aSrcPtr = mNativeAlphaData.get();
 
 			int aSize = mWidth*mHeight;
 			for (int i = 0; i < aSize; i++)
@@ -1191,16 +1150,15 @@ uint32_t* MemoryImage::GetBits()
 		}
 		else if ((mRenderData == nullptr) || (!mApp->mGLInterface->RecoverBits(this)))
 		{
-			memset(mBits, 0, aSize*sizeof(uint32_t));
+			memset(mBits.get(), 0, aSize*sizeof(uint32_t));
 		}
 	}
 
-	return mBits;
+	return mBits.get();
 }
 
-void MemoryImage::FillRect(const Rect& theRect, const Color& theColor, int theDrawMode)
+void MemoryImage::FillRect(const Rect& theRect, const Color& theColor, [[maybe_unused]] int theDrawMode)
 {
-	(void)theDrawMode;
 	uint32_t src = theColor.ToInt();
 
 	uint32_t* aBits = GetBits();
@@ -1302,8 +1260,8 @@ void MemoryImage::AdditiveBlt(Image* theImage, int theX, int theY, const Rect& t
 		}
 		else
 		{
-			uint32_t* aColorTable = aSrcMemoryImage->mColorTable;
-			uchar* aSrcBits = aSrcMemoryImage->mColorIndices;
+			uint32_t* aColorTable = aSrcMemoryImage->mColorTable.get();
+			uchar* aSrcBits = aSrcMemoryImage->mColorIndices.get();
 
 			#define NEXT_SRC_COLOR		(aColorTable[*(aSrcPtr++)])
 			#define SRC_TYPE uchar
@@ -1343,8 +1301,8 @@ void MemoryImage::NormalBlt(Image* theImage, int theX, int theY, const Rect& the
 		}
 		else
 		{
-			uint32_t* aColorTable = aSrcMemoryImage->mColorTable;
-			uchar* aSrcPixelsRow = aSrcMemoryImage->mColorIndices + (theSrcRect.mY * theImage->mWidth) + theSrcRect.mX;
+			uint32_t* aColorTable = aSrcMemoryImage->mColorTable.get();
+			uchar* aSrcPixelsRow = aSrcMemoryImage->mColorIndices.get() + (theSrcRect.mY * theImage->mWidth) + theSrcRect.mX;
 
 			#define NEXT_SRC_COLOR		(aColorTable[*(aSrcPtr++)])
 			#define READ_SRC_COLOR		(aColorTable[*(aSrcPtr)])
@@ -1361,9 +1319,8 @@ void MemoryImage::NormalBlt(Image* theImage, int theX, int theY, const Rect& the
 	}
 }
 
-void MemoryImage::Blt(Image* theImage, int theX, int theY, const Rect& theSrcRect, const Color& theColor, int theDrawMode, bool linearFilter)
+void MemoryImage::Blt(Image* theImage, int theX, int theY, const Rect& theSrcRect, const Color& theColor, int theDrawMode, [[maybe_unused]] bool linearFilter)  // Software rendering does not use texture filtering
 {
-	(void)linearFilter;  // Software rendering does not use texture filtering
 	theImage->mDrawn = true;
 
 	DBG_ASSERTE((theColor.mRed >= 0) && (theColor.mRed <= 255));
@@ -1483,7 +1440,7 @@ void MemoryImage::BltRotated(Image* theImage, float theX, float theY, const Rect
 	{
 		if (aMemoryImage->mColorTable == nullptr)
 		{
-			uint32_t* aSrcBits = aMemoryImage->GetBits() + theSrcRect.mX + theSrcRect.mY*theSrcRect.mWidth;
+			uint32_t* aSrcBits = aMemoryImage->GetBits() + theSrcRect.mX + theSrcRect.mY*aMemoryImage->mWidth;
 
 			#define SRC_TYPE uint32_t
 			#define READ_COLOR(ptr) (*(ptr))
@@ -1502,8 +1459,8 @@ void MemoryImage::BltRotated(Image* theImage, float theX, float theY, const Rect
 		}
 		else
 		{
-			uint32_t* aColorTable = aMemoryImage->mColorTable;
-			uchar* aSrcBits = aMemoryImage->mColorIndices + theSrcRect.mX + theSrcRect.mY*theSrcRect.mWidth;
+			uint32_t* aColorTable = aMemoryImage->mColorTable.get();
+			uchar* aSrcBits = aMemoryImage->mColorIndices.get() + theSrcRect.mX + theSrcRect.mY*aMemoryImage->mWidth;
 
 			#define SRC_TYPE uchar
 			#define READ_COLOR(ptr) (aColorTable[*(ptr)])
@@ -1525,16 +1482,14 @@ void MemoryImage::BltRotated(Image* theImage, float theX, float theY, const Rect
 	}
 }
 
-void MemoryImage::SlowStretchBlt(Image* theImage, const Rect& theDestRect, const FRect& theSrcRect, const Color& theColor, int theDrawMode)
+void MemoryImage::SlowStretchBlt(Image* theImage, const Rect& theDestRect, const FRect& theSrcRect, [[maybe_unused]] const Color& theColor, [[maybe_unused]] int theDrawMode)
 {
-	(void)theColor;(void)theDrawMode;
 	theImage->mDrawn = true;
 
 	// This thing was a pain to write.  I bet i could have gotten something just as good
 	// from some Graphics Gems book.
 
-	uint32_t* aDestEnd = GetBits() + (mWidth * mHeight);
-	(void)aDestEnd; // Unused in Release mode
+	[[maybe_unused]] uint32_t* aDestEnd = GetBits() + (mWidth * mHeight);  // Unused in Release mode
 
 	MemoryImage* aSrcMemoryImage = dynamic_cast<MemoryImage*>(theImage);
 
@@ -1554,8 +1509,8 @@ void MemoryImage::SlowStretchBlt(Image* theImage, const Rect& theDestRect, const
 		}
 		else
 		{
-			uint32_t* aColorTable = aSrcMemoryImage->mColorTable;
-			uchar* aSrcBits = aSrcMemoryImage->mColorIndices;
+			uint32_t* aColorTable = aSrcMemoryImage->mColorTable.get();
+			uchar* aSrcBits = aSrcMemoryImage->mColorIndices.get();
 
 			#define SRC_TYPE uchar
 			#define READ_COLOR(ptr) (aColorTable[*(ptr)])
@@ -1571,9 +1526,8 @@ void MemoryImage::SlowStretchBlt(Image* theImage, const Rect& theDestRect, const
 }
 
 //TODO: Make the special version
-void MemoryImage::FastStretchBlt(Image* theImage, const Rect& theDestRect, const FRect& theSrcRect, const Color& theColor, int theDrawMode)
+void MemoryImage::FastStretchBlt(Image* theImage, const Rect& theDestRect, const FRect& theSrcRect, const Color& theColor, [[maybe_unused]] int theDrawMode)
 {
-	(void)theDrawMode;
 	theImage->mDrawn = true;
 
 	MemoryImage* aSrcMemoryImage = dynamic_cast<MemoryImage*>(theImage);
@@ -1728,9 +1682,8 @@ void MemoryImage::BltTrianglesTexHelper(Image *theTexture, const TriVertex theVe
 
 }
 
-void MemoryImage::FillScanLinesWithCoverage(Span* theSpans, int theSpanCount, const Color& theColor, int theDrawMode, const uint8_t* theCoverage, int theCoverX, int theCoverY, int theCoverWidth, int theCoverHeight)
+void MemoryImage::FillScanLinesWithCoverage(Span* theSpans, int theSpanCount, const Color& theColor, [[maybe_unused]] int theDrawMode, const uint8_t* theCoverage, int theCoverX, int theCoverY, int theCoverWidth, [[maybe_unused]] int theCoverHeight)
 {
-	(void)theDrawMode;(void)theCoverHeight;
 	uint32_t* theBits = GetBits();
 	uint32_t src = theColor.ToInt();
 	for (int i = 0; i < theSpanCount; ++i)
@@ -1792,27 +1745,21 @@ bool MemoryImage::Palletize()
 	if (mBits == nullptr)
 		return false;
 
-	mColorIndices = new uchar[mWidth*mHeight];
-	mColorTable = new uint32_t[256];
+	mColorIndices = std::make_unique<uchar[]>(mWidth*mHeight);
+	mColorTable = std::make_unique<uint32_t[]>(256);
 
-	if (!Quantize8Bit(mBits, mWidth, mHeight, mColorIndices, mColorTable))
+	if (!Quantize8Bit(mBits.get(), mWidth, mHeight, mColorIndices.get(), mColorTable.get()))
 	{
-		delete [] mColorIndices;
-		mColorIndices = nullptr;
-
-		delete [] mColorTable;
-		mColorTable = nullptr;
+		mColorIndices.reset();
+		mColorTable.reset();
 
 		mWantPal = false;
 
 		return false;
 	}
 
-	delete [] mBits;
-	mBits = nullptr;
-
-	delete [] mNativeAlphaData;
-	mNativeAlphaData = nullptr;
+	mBits.reset();
+	mNativeAlphaData.reset();
 
 	mWantPal = true;
 

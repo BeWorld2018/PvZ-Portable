@@ -19,6 +19,7 @@
  * along with PvZ-Portable. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <format>
 #include "PvzpDebug.h"
 #include "PvzpCommon.h"
 #include "PvzpStringFile.h"
@@ -70,7 +71,7 @@ bool PvzpStringListReadName(const char*& thePtr, std::string& theName)
 	{
 		if (strspn(thePtr, " \n\r\t") != strlen(thePtr))  // the remaining text is not all whitespace
 		{
-			PvzpTrace("Failed to find string name");
+			PvzpLogLn("Failed to find string name");
 			return false;
 		}
 
@@ -82,7 +83,7 @@ bool PvzpStringListReadName(const char*& thePtr, std::string& theName)
 		const char* aNameEnd = strchr(aNameStart + 1, ']');
 		if (aNameEnd == nullptr)
 		{
-			PvzpTrace("Failed to find ']'");
+			PvzpLogLn("Failed to find ']'");
 			return false;
 		}
 
@@ -90,7 +91,7 @@ bool PvzpStringListReadName(const char*& thePtr, std::string& theName)
 		theName = Sexy::Trim(std::string(aNameStart + 1, aCount));
 		if (theName.size() == 0)
 		{
-			PvzpTrace("Name Too Short");
+			PvzpLogLn("Name Too Short");
 			return false;
 		}
 
@@ -145,7 +146,7 @@ bool PvzpStringListReadFile(const char* theFileName)
 	std::string aFileContent;
 	if (!gSexyAppBase->ReadUTF8StringFromFile(theFileName, &aFileContent))
 	{
-		PvzpTrace("Failed to open '%s'", theFileName);
+		PvzpLogLn("Failed to open '{}'", theFileName);
 		return false;
 	}
 
@@ -155,10 +156,10 @@ bool PvzpStringListReadFile(const char* theFileName)
 void PvzpStringListLoad(const char* theFileName)
 {
 	if (!PvzpStringListReadFile(theFileName))
-		PvzpErrorMessageBox(Sexy::StrFormat("Failed to load string list file '%s'", theFileName).c_str(), "Error");
+		PvzpErrorMessageBox(std::format("Failed to load string list file '{}'", theFileName), "Error");
 }
 
-std::string PvzpStringListFind(std::string_view theName)
+std::string_view PvzpStringListFind(std::string_view theName)
 {
 	auto anItr = gSexyAppBase->mStringProperties.find(theName);
 	if (anItr != gSexyAppBase->mStringProperties.end())
@@ -167,45 +168,37 @@ std::string PvzpStringListFind(std::string_view theName)
 	}
 	else
 	{
-		return Sexy::StrFormat("<Missing %s>", std::string(theName).c_str());
+		thread_local std::string aMissing;
+		aMissing = "<Missing " + std::string(theName) + ">";
+		return aMissing;
 	}
 }
 
-std::string PvzpStringTranslate(std::string_view theString)
+std::string_view PvzpStringTranslate(std::string_view theString)
 {
 	if (theString.size() >= 3 && theString[0] == '[')
 	{
 		std::string_view aName = theString.substr(1, theString.size() - 2);
 		return PvzpStringListFind(aName);
 	}
-	return std::string(theString);
+	return theString;
 }
 
-std::string PvzpStringTranslate(const char* theString)
-{
-	if (theString != nullptr)
-	{
-		int aLen = strlen(theString);
-		if (aLen >= 3 && theString[0] == '[')
-		{
-			std::string aName(theString, 1, aLen - 2);
-			return PvzpStringListFind(aName);
-		}
-		else
-			return theString;
-	}
-	else
-		return "";
-}
-
-bool PvzpStringListExists(std::string_view theString)
+std::optional<std::string_view> PvzpStringTryTranslate(std::string_view theString)
 {
 	if (theString.size() >= 3 && theString[0] == '[')
 	{
 		std::string_view aName = theString.substr(1, theString.size() - 2);
-		return gSexyAppBase->mStringProperties.find(aName) != gSexyAppBase->mStringProperties.end();
+		auto anItr = gSexyAppBase->mStringProperties.find(aName);
+		if (anItr != gSexyAppBase->mStringProperties.end())
+			return anItr->second;
 	}
-	return false;
+	return std::nullopt;
+}
+
+bool PvzpStringListExists(std::string_view theString)
+{
+	return PvzpStringTryTranslate(theString).has_value();
 }
 
 void PvzpWriteStringSetFormat(const char* theFormat, PvzpStringListFormat& theCurrentFormat)
@@ -495,7 +488,7 @@ int PvzpDrawStringWrappedHelper(Graphics* g, const std::string& theText, const R
 
 void PvzpDrawStringWrapped(Graphics* g, std::string_view theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification)
 {
-	std::string aTextFinal = PvzpStringTranslate(theText);
+	std::string aTextFinal(PvzpStringTranslate(theText));
 	Rect aRectPvzpUse = theRect;
 	if (theJustification == DrawStringJustification::DS_ALIGN_LEFT_VERTICAL_MIDDLE ||
 		theJustification == DrawStringJustification::DS_ALIGN_RIGHT_VERTICAL_MIDDLE ||

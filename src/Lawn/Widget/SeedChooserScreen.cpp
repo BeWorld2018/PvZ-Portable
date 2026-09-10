@@ -54,11 +54,11 @@ SeedChooserScreen::SeedChooserScreen()
 	mLastMouseY = -1;
 	mChooseState = CHOOSE_NORMAL;
 	mViewLawnTime = 0;
-	mToolTip = new ToolTipWidget();
+	mToolTip = std::make_unique<ToolTipWidget>();
 	mToolTip->mMaxLinesWidth = mApp->GetInteger("SEED_CHOOSER_SCREEN_TOOL_TIP_MAX_LINE_WIDTH", 0);
 	mToolTipSeed = -1;
 
-	mStartButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Start);
+	mStartButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Start);
 	mStartButton->SetLabel("[LETS_ROCK_BUTTON]"); // the localization key name is wrong
 	mStartButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
 	mStartButton->mOverImage = nullptr;
@@ -66,24 +66,24 @@ SeedChooserScreen::SeedChooserScreen()
 	mStartButton->mDisabledImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED;
 	mStartButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
 	mStartButton->SetFont(Sexy::FONT_DWARVENTODCRAFT18YELLOW);
-	mStartButton->mColors[GameButton::COLOR_LABEL_HILITE] = Color::White;
+	mStartButton->SetLabelHiliteColor(Color::White);
 	mStartButton->Resize(154, 545, 156, 42);
 	mStartButton->mTextOffsetY = -1;
 	EnableStartButton(false);
 
-	mMenuButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Menu);
+	mMenuButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Menu);
 	mMenuButton->SetLabel("[MENU_BUTTON]");
 	mMenuButton->Resize(681, -10, 117, 46);
 	mMenuButton->mDrawStoneButton = true;
 
-	mRandomButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Random);
+	mRandomButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Random);
 	mRandomButton->SetLabel("(Debug Play)");
 	mRandomButton->mButtonImage = Sexy::IMAGE_BLANK;
 	mRandomButton->mOverImage = Sexy::IMAGE_BLANK;
 	mRandomButton->mDownImage = Sexy::IMAGE_BLANK;
 	mRandomButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mRandomButton->mColors[0] = Color(255, 240, 0);
-	mRandomButton->mColors[1] = Color(200, 200, 255);
+	mRandomButton->SetLabelColor(Color(255, 240, 0));
+	mRandomButton->SetLabelHiliteColor(Color(200, 200, 255));
 	mRandomButton->Resize(332, 546, 100, 30);
 	if (!mApp->mCheatKeys)
 	{
@@ -97,14 +97,14 @@ SeedChooserScreen::SeedChooserScreen()
 	int aImageWidth = aBtnImage->GetWidth();
 	int aImageHeight = aOverImage->GetHeight();
 
-	mViewLawnButton = new GameButton(SeedChooserScreen::SeedChooserScreen_ViewLawn);
+	mViewLawnButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_ViewLawn);
 	mViewLawnButton->SetLabel("[VIEW_LAWN]");
 	mViewLawnButton->mButtonImage = aBtnImage;
 	mViewLawnButton->mOverImage = aOverImage;
 	mViewLawnButton->mDownImage = nullptr;
 	mViewLawnButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mViewLawnButton->mColors[0] = aBtnColor;
-	mViewLawnButton->mColors[1] = aBtnColor;
+	mViewLawnButton->SetLabelColor(aBtnColor);
+	mViewLawnButton->SetLabelHiliteColor(aBtnColor);
 	mViewLawnButton->Resize(22, 561, aImageWidth, aImageHeight);
 	mViewLawnButton->mParentWidget = this;
 	mViewLawnButton->mTextOffsetY = 1;
@@ -114,31 +114,31 @@ SeedChooserScreen::SeedChooserScreen()
 		mViewLawnButton->mDisabled = true;
 	}
 
-	mAlmanacButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Almanac);
+	mAlmanacButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Almanac);
 	mAlmanacButton->SetLabel("[ALMANAC_BUTTON]");
 	mAlmanacButton->mButtonImage = aBtnImage;
 	mAlmanacButton->mOverImage = aOverImage;
 	mAlmanacButton->mDownImage = nullptr;
 	mAlmanacButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mAlmanacButton->mColors[0] = aBtnColor;
-	mAlmanacButton->mColors[1] = aBtnColor;
+	mAlmanacButton->SetLabelColor(aBtnColor);
+	mAlmanacButton->SetLabelHiliteColor(aBtnColor);
 	mAlmanacButton->Resize(560, 572, aImageWidth, aImageHeight);
 	mAlmanacButton->mParentWidget = this;
 	mAlmanacButton->mTextOffsetY = 1;
 
-	mStoreButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Store);
+	mStoreButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Store);
 	mStoreButton->SetLabel("[SHOP_BUTTON]");
 	mStoreButton->mButtonImage = aBtnImage;
 	mStoreButton->mOverImage = aOverImage;
 	mStoreButton->mDownImage = nullptr;
 	mStoreButton->SetFont(Sexy::FONT_BRIANNETOD12);
-	mStoreButton->mColors[0] = aBtnColor;
-	mStoreButton->mColors[1] = aBtnColor;
+	mStoreButton->SetLabelColor(aBtnColor);
+	mStoreButton->SetLabelHiliteColor(aBtnColor);
 	mStoreButton->Resize(680, 572, aImageWidth, aImageHeight);
 	mStoreButton->mParentWidget = this;
 	mStoreButton->mTextOffsetY = 1;
 
-	mImitaterButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Imitater);
+	mImitaterButton = std::make_unique<GameButton>(SeedChooserScreen::SeedChooserScreen_Imitater);
 	mImitaterButton->mButtonImage = Sexy::IMAGE_IMITATERSEED;
 	mImitaterButton->mOverImage = Sexy::IMAGE_IMITATERSEED;
 	mImitaterButton->mDownImage = Sexy::IMAGE_IMITATERSEED;
@@ -311,17 +311,7 @@ void SeedChooserScreen::GetSeedPositionInBank(int theIndex, int& x, int& y)
 	y = mBoard->mSeedBank->mY - mY + 8;
 }
 
-SeedChooserScreen::~SeedChooserScreen()
-{
-	if (mStartButton) delete mStartButton;
-	if (mRandomButton) delete mRandomButton;
-	if (mViewLawnButton) delete mViewLawnButton;
-	if (mAlmanacButton) delete mAlmanacButton;
-	if (mImitaterButton) delete mImitaterButton;
-	if (mStoreButton) delete mStoreButton;
-	if (mToolTip) delete mToolTip;
-	if (mMenuButton) delete mMenuButton;
-}
+SeedChooserScreen::~SeedChooserScreen() = default;
 
 unsigned int SeedChooserScreen::SeedNotRecommendedToPick(SeedType theSeedType)
 {
@@ -610,7 +600,7 @@ bool SeedChooserScreen::CheckSeedUpgrade(SeedType theSeedTypeTo, SeedType theSee
 	if (mApp->IsSurvivalMode() || !PickedPlantType(theSeedTypeTo) || PickedPlantType(theSeedTypeFrom))
 		return true;
 
-	std::string aWarning = PvzpStringTranslate("[SEED_CHOOSER_UPGRADE_WARNING]");
+	std::string aWarning(PvzpStringTranslate("[SEED_CHOOSER_UPGRADE_WARNING]"));
 	aWarning = PvzpReplaceString(aWarning, "{UPGRADE_TO}", Plant::GetNameString(theSeedTypeTo));
 	aWarning = PvzpReplaceString(aWarning, "{UPGRADE_FROM}", Plant::GetNameString(theSeedTypeFrom));
 	return DisplayRepickWarningDialog(aWarning.c_str());
@@ -803,8 +793,8 @@ SeedType SeedChooserScreen::FindSeedInBank(int theIndexInBank)
 void SeedChooserScreen::EnableStartButton(bool theEnabled)
 {
 	mStartButton->SetDisabled(!theEnabled);
-	if (theEnabled) mStartButton->mColors[GameButton::COLOR_LABEL] = Color::White;
-	else mStartButton->mColors[GameButton::COLOR_LABEL] = Color(64, 64, 64);
+	if (theEnabled) mStartButton->SetLabelColor(Color::White);
+	else mStartButton->SetLabelColor(Color(64, 64, 64));
 }
 
 void SeedChooserScreen::ClickedSeedInBank(ChosenSeed& theChosenSeed)
@@ -958,9 +948,8 @@ void SeedChooserScreen::CancelLawnView()
 	if (mChooseState == CHOOSE_VIEW_LAWN && mViewLawnTime > 100 && mViewLawnTime <= 250) mViewLawnTime = 251;
 }
 
-void SeedChooserScreen::MouseUp(int x, int y, int theClickCount)
+void SeedChooserScreen::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, int theClickCount)
 {
-	(void)x;(void)y;
 	if (theClickCount == 1)
 	{
 		if (mMenuButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Menu);

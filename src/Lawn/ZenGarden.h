@@ -25,11 +25,12 @@
 #include "../ConstEnums.h"
 #include <vector>
 #include <string>
+#include <span>
 #include <stdint.h>
 #include <time.h>
 
-#define ZEN_MAX_GRIDSIZE_X 8
-#define ZEN_MAX_GRIDSIZE_Y 4
+constexpr const int ZEN_MAX_GRIDSIZE_X = 8;
+constexpr const int ZEN_MAX_GRIDSIZE_Y = 4;
 
 class LawnApp;
 class Board;
@@ -85,7 +86,7 @@ public:
 	void                    GotoNextGarden();
 	PottedPlant* GetPottedPlantInWheelbarrow();
 	void                    RemovePottedPlant(Plant* thePlant);
-	const SpecialGridPlacement*   GetSpecialGridPlacements(int& theCount);
+	std::span<const SpecialGridPlacement> GetSpecialGridPlacements();
 	int                     PixelToGridX(int theX, int theY);
 	int                     PixelToGridY(int theX, int theY);
 	int                     GridToPixelX(int theGridX, int theGridY);

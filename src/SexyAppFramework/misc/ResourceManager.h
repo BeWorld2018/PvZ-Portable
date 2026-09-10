@@ -29,6 +29,7 @@
 #include "graphics/Image.h"
 #include "SexyAppBase.h"
 #include "XMLParser.h"
+#include <memory>
 #include <string>
 #include <map>
 
@@ -105,8 +106,8 @@ public: // TODO: revert to protected
 
 	struct FontRes : public BaseRes
 	{
-		_Font *mFont;
-		Image *mImage;
+		std::unique_ptr<_Font> mFont;
+		std::unique_ptr<Image> mImage;
 		std::string mImagePath;
 		std::string mTags;
 
@@ -119,11 +120,11 @@ public: // TODO: revert to protected
 		int mSize;
 
 
-		FontRes() { mType = ResType_Font; }
+		FontRes();
 		void         DeleteResource() override;
 	};
 
-	typedef std::map<std::string,BaseRes*> ResMap;
+	typedef std::map<std::string,std::unique_ptr<BaseRes>> ResMap;
 	typedef std::list<BaseRes*> ResList;
 	typedef std::map<std::string,ResList,StringLessNoCase> ResGroupMap;
 
@@ -133,7 +134,7 @@ public: // TODO: revert to protected
 	ResMap					mSoundMap;
 	ResMap					mFontMap;
 
-	XMLParser*				mXMLParser;
+	std::unique_ptr<XMLParser>	mXMLParser;
 	std::string				mError;
 	bool					mHasFailed;
 	SexyAppBase*			mApp;
@@ -151,7 +152,7 @@ public: // TODO: revert to protected
 
 	bool					Fail(const std::string& theErrorText);
 
-	virtual bool			ParseCommonResource(XMLElement &theElement, BaseRes *theRes, ResMap &theMap);
+	virtual bool			ParseCommonResource(XMLElement &theElement, std::unique_ptr<BaseRes> &theRes, ResMap &theMap);
 	virtual bool			ParseSoundResource(XMLElement &theElement);
 	virtual bool			ParseImageResource(XMLElement &theElement);
 	virtual bool			ParseFontResource(XMLElement &theElement);

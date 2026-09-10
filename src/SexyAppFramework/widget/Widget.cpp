@@ -30,6 +30,7 @@
 #include "SexyAppBase.h"
 #include "misc/Debug.h"
 #include "misc/ResourceManager.h"
+#include <memory>
 
 using namespace Sexy;
 
@@ -54,7 +55,6 @@ Widget::Widget()
 Widget::~Widget()
 {
 	gSexyAppBase->mResourceManager->ReleaseTrackedResources(mLoadedResourceNames);
-	mColors.clear();
 }
 
 void Widget::WidgetRemovedHelper()
@@ -92,9 +92,8 @@ void Widget::OrderInManagerChanged()
 {
 }
 
-bool Widget::IsPointVisible(int x, int y)
+bool Widget::IsPointVisible([[maybe_unused]] int x, [[maybe_unused]] int y)
 {
-	(void)x;(void)y;
 	return true;
 }
 
@@ -118,55 +117,11 @@ void Widget::SetVisible(bool isVisible)
 void Widget::Draw(Graphics*) {}
 void Widget::DrawOverlay(Graphics*){}
 
-void Widget::DrawOverlay(Graphics* g, int thePriority)
+void Widget::DrawOverlay(Graphics* g, [[maybe_unused]] int thePriority)
 {
-	(void)thePriority;
 	DrawOverlay(g);
 }
 
-
-void Widget::SetColors(int theColors[][3], int theNumColors)
-{
-	mColors.clear();
-
-	for (int i = 0; i < theNumColors; i++)
-		SetColor(i, Color(theColors[i][0], theColors[i][1], theColors[i][2]));
-	MarkDirty();
-}
-
-void Widget::SetColors(int theColors[][4], int theNumColors)
-{
-	mColors.clear();
-
-	for (int i = 0; i < theNumColors; i++)
-		SetColor(i, Color(theColors[i][0], theColors[i][1], theColors[i][2], theColors[i][3]));
-
-	MarkDirty();
-}
-
-void Widget::SetColor(int theIdx, const Color& theColor)
-{
-	if (theIdx >= (int)mColors.size())
-		mColors.resize(theIdx + 1);
-
-	mColors[theIdx] = theColor;
-	MarkDirty();
-}
-
-const Color& Widget::GetColor(int theIdx)
-{
-	static Color aColor;
-	if (theIdx < (int) mColors.size())
-		return mColors[theIdx];
-	return aColor;
-}
-
-Color Widget::GetColor(int theIdx, const Color& theDefaultColor)
-{
-	if (theIdx < (int) mColors.size())
-		return mColors[theIdx];
-	return theDefaultColor;
-}
 
 void Widget::Resize(int theX, int theY, int theWidth, int theHeight)
 {
@@ -409,10 +364,9 @@ void Widget::WriteNumberFromStrip(Graphics* g, int theNumber, int theX, int theY
 		aDivisor /= 10;
 		int aDigit = (theNumber / aDivisor) % 10;
 
-		Graphics* aClipG = g->Create();
+		std::unique_ptr<Graphics> aClipG(g->Create());
 		aClipG->ClipRect(theX + aDigitIdx*(aDigitLen + aSpacing), theY, aDigitLen, theNumberStrip->GetHeight());
 		aClipG->DrawImage(theNumberStrip, theX + aDigitIdx*(aDigitLen + aSpacing) - aDigit*aDigitLen, theY);
-		delete aClipG;
 	}
 }
 

@@ -23,6 +23,7 @@
 #define __BOARD_H__
 
 #include <cstdint>
+#include <memory>
 
 #include "../ConstEnums.h"
 #include "../PvzpLib/DataArray.h"
@@ -38,14 +39,14 @@
 
 using namespace Sexy;
 
-#define MAX_GRID_SIZE_X 9
-#define MAX_GRID_SIZE_Y 6
-#define MAX_ZOMBIES_IN_WAVE 50
-#define MAX_ZOMBIE_WAVES 100
-#define MAX_GRAVE_STONES MAX_GRID_SIZE_X * MAX_GRID_SIZE_Y
-#define MAX_POOL_GRID_SIZE 10
-#define MAX_RENDER_ITEMS 2048
-#define PROGRESS_METER_COUNTER 150
+constexpr const int MAX_GRID_SIZE_X = 9;
+constexpr const int MAX_GRID_SIZE_Y = 6;
+constexpr const int MAX_ZOMBIES_IN_WAVE = 50;
+constexpr const int MAX_ZOMBIE_WAVES = 100;
+constexpr const int MAX_GRAVE_STONES = MAX_GRID_SIZE_X * MAX_GRID_SIZE_Y;
+constexpr const int MAX_POOL_GRID_SIZE = 10;
+constexpr const int MAX_RENDER_ITEMS = 2048;
+constexpr const int PROGRESS_METER_COUNTER = 150;
 
 class LawnApp;
 class CursorObject;
@@ -133,16 +134,16 @@ public:
 	DataArray<Coin>					mCoins;
 	DataArray<LawnMower>			mLawnMowers;
 	DataArray<GridItem>				mGridItems;
-	CursorObject*					mCursorObject;
-	CursorPreview*					mCursorPreview;
-	MessageWidget*					mAdvice;
-	SeedBank*						mSeedBank;
-	GameButton*						mMenuButton;
-	GameButton*						mStoreButton;
+	std::unique_ptr<CursorObject>		mCursorObject;
+	std::unique_ptr<CursorPreview>		mCursorPreview;
+	std::unique_ptr<MessageWidget>		mAdvice;
+	std::unique_ptr<SeedBank>			mSeedBank;
+	std::unique_ptr<GameButton>			mMenuButton;
+	std::unique_ptr<GameButton>			mStoreButton;
 	bool							mIgnoreMouseUp;
-	ToolTipWidget*					mToolTip;
-	CutScene*						mCutScene;
-	Challenge*						mChallenge;
+	std::unique_ptr<ToolTipWidget>		mToolTip;
+	std::unique_ptr<CutScene>			mCutScene;
+	std::unique_ptr<Challenge>			mChallenge;
 	bool							mPaused;
 	GridSquareType					mGridSquareType[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y];
 	int32_t							mGridCelLook[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y];
@@ -325,7 +326,7 @@ public:
 //	inline void						MouseDownNormal(int x, int y, int theClickCount) { /* not found */; }
 	bool							CanInteractWithBoardButtons();
 	void							DrawProgressMeter(Graphics* g);
-	void							UpdateToolTip();
+	void							UpdateToolTip(const HitResult* theHitResult = nullptr);
 	Plant*							GetTopPlantAt(int theGridX, int theGridY, PlantPriority thePriority);
 	void							GetPlantsOnLawn(int theGridX, int theGridY, PlantsOnLawn* thePlantOnLawn);
 	int					CountSunFlowers();
@@ -400,14 +401,14 @@ public:
 	void							UpdateFwoosh();
 	Plant*							SpecialPlantHitTest(int x, int y);
 	void							UpdateMousePosition();
-	Plant*				ToolHitTestHelper(HitResult* theHitResult);
+	Plant*				ToolHitTestHelper(const HitResult* theHitResult);
 	Plant*				ToolHitTest(int theX, int theY);
 	bool							CanAddGraveStoneAt(int theGridX, int theGridY);
 	void							UpdateGridItems();
 	GridItem*			AddAGraveStone(int theGridX, int theGridY);
 	int								GetSurvivalFlagsCompleted();
 	bool							HasProgressMeter();
-	void							UpdateCursor();
+	void							UpdateCursor(const HitResult* theHitResult = nullptr);
 	void							UpdateTutorial();
 	SeedType						GetSeedTypeInCursor();
 	int					CountPlantByType(SeedType theSeedType);
@@ -452,7 +453,7 @@ public:
 	GridItem*			AddACrater(int theGridX, int theGridY);
 	void							InitLawnMowers();
 	bool					IsPlantInCursor();
-	void							HighlightPlantsForMouse(int theMouseX, int theMouseY);
+	void							HighlightPlantsForMouse(int theMouseX, int theMouseY, const HitResult* theHitResult);
 	void							ClearFogAroundPlant(Plant* thePlant, int theSize);
 	void					RemoveParticleByType(ParticleEffect theEffectType);
 	GridItem*			GetScaryPotAt(int theGridX, int theGridY);
@@ -460,7 +461,6 @@ public:
 	void					ClearAdviceImmediately();
 	bool					IsFinalScaryPotterStage();
 	void					DisplayAdviceAgain(std::string_view theAdvice, MessageStyle theMessageStyle, AdviceType theHelpIndex);
-	GridItem*						GetSquirrelAt(int theGridX, int theGridY);
 	GridItem*						GetZenToolAt(int theGridX, int theGridY);
 	bool							IsPlantInGoldWateringCanRange(int theMouseX, int theMouseY, Plant* thePlant);
 	bool							StageHasZombieWalkInFromRight();

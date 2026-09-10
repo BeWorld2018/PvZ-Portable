@@ -48,6 +48,7 @@
 #include "misc/PerfTimer.h"
 #include "widget/WidgetManager.h"
 #include <algorithm>
+#include <format>
 
 static const int	TimePanRightStart				= 1500;
 static const int	TimePanRightEnd					= 3500;
@@ -116,16 +117,11 @@ CutScene::CutScene()
 	mCrazyDaveCountDown = 0;
 	mCrazyDaveLastTalkIndex = -1;
 	mUpsellHideBoard = false;
-	mUpsellChallengeScreen = nullptr;
 	mPreUpdatingBoard = false;
 }
 
 CutScene::~CutScene()
 {
-	if (mUpsellChallengeScreen)
-	{
-		delete mUpsellChallengeScreen;
-	}
 	mApp->mMuteSoundsForCutscene = false;
 
 	mApp->mResourceManager->ReleaseTrackedResources(mLoadedResourceNames);
@@ -294,7 +290,7 @@ void CutScene::FindPlaceForStreetZombies(ZombieType theZombieType, bool theZombi
 
 	if (aPicksCount == 0)
 	{
-		PvzpTrace("No place for street zombie!!");
+		PvzpLogLn("No place for street zombie!!");
 		thePosX = 2;
 		thePosY = 2;
 	}
@@ -338,8 +334,6 @@ bool CutScene::Is2x2Zombie(ZombieType theZombieType)
 
 void CutScene::PreloadResources()
 {
-	PvzpHesitationTrace("pre-CutScene::PreloadResources()");
-
 	if (mPreloaded)
 	{
 		return;
@@ -501,8 +495,7 @@ void CutScene::PreloadResources()
 	PlaceStreetZombies();
 
 	mBoard->mPreloadTime = std::max(aTimer.GetDuration(), 0.0);
-	PvzpTrace("preloading: %d ms", mBoard->mPreloadTime);
-	PvzpHesitationTrace("CutScene::PreloadResources");
+	PvzpLogLn("preloading: {} ms", mBoard->mPreloadTime);
 }
 
 void CutScene::PlaceStreetZombies()
@@ -1151,7 +1144,7 @@ void CutScene::AnimateBoard()
 	{
 		int aTimeSeedChoserSlideOnStart = TimeSeedChoserSlideOnStart + mCrazyDaveTime;
 		int aTimeSeedChoserSlideOnEnd = TimeSeedChoserSlideOnEnd + mCrazyDaveTime;
-		SeedChooserScreen* aSeedChoser = mApp->mSeedChooserScreen;
+		SeedChooserScreen* aSeedChoser = mApp->mSeedChooserScreen.get();
 		// Seed chooser slides on
 		if (mCutsceneTime > aTimeSeedChoserSlideOnStart && mCutsceneTime <= aTimeSeedChoserSlideOnEnd)
 		{
@@ -1327,7 +1320,7 @@ void CutScene::AnimateBoard()
 		}
 	}
 
-	mApp->mSeedChooserScreen->mParent->BringToFront(mApp->mSeedChooserScreen);
+	mApp->mSeedChooserScreen->mParent->BringToFront(mApp->mSeedChooserScreen.get());
 }
 
 void CutScene::ShowShovel()
@@ -1360,7 +1353,7 @@ void CutScene::StartSeedChooser()
 {
 	mApp->mSeedChooserScreen->mMouseVisible = true;
 	mSeedChoosing = true;
-	mApp->mWidgetManager->SetFocus(mApp->mSeedChooserScreen);
+	mApp->mWidgetManager->SetFocus(mApp->mSeedChooserScreen.get());
 }
 
 void CutScene::EndSeedChooser()
@@ -1656,9 +1649,8 @@ void CutScene::AdvanceCrazyDaveDialog(bool theJustSkipping)
 	}
 }
 
-void CutScene::MouseDown(int theX, int theY)
+void CutScene::MouseDown([[maybe_unused]] int theX, [[maybe_unused]] int theY)
 {
-	(void)theX;(void)theY;
 	if (mApp->mCheatKeys && mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
 	{
 		mCrazyDaveCountDown = std::min(mCrazyDaveCountDown, 1);
@@ -1782,11 +1774,7 @@ void CutScene::ClearUpsellBoard()
 	}
 	mBoard->mPoolSparklyParticleID = ParticleSystemID::PARTICLESYSTEMID_NULL;
 
-	if (mUpsellChallengeScreen)
-	{
-		delete mUpsellChallengeScreen;
-		mUpsellChallengeScreen = nullptr;
-	}
+	mUpsellChallengeScreen.reset();
 }
 
 void CutScene::AddUpsellZombie(ZombieType theZombieType, int thePixelX, int theGridY)
@@ -1971,7 +1959,7 @@ void CutScene::LoadUpsellBoardFog()
 void CutScene::LoadUpsellChallengeScreen()
 {
 	ClearUpsellBoard();
-	mUpsellChallengeScreen = new ChallengeScreen(mApp, ChallengePage::CHALLENGE_PAGE_CHALLENGE);
+	mUpsellChallengeScreen = std::make_unique<ChallengeScreen>(mApp, ChallengePage::CHALLENGE_PAGE_CHALLENGE);
 }
 
 void CutScene::LoadUpsellBoardRoof()
@@ -2154,8 +2142,8 @@ void CutScene::UpdateUpsell()
 			Reanimation* aReanimHead = mApp->AddReanimation(0, 0, 0, ReanimationType::REANIM_THREEPEATER);
 			aReanimHead->mLoopType = ReanimLoopType::REANIM_LOOP;
 			aReanimHead->mAnimRate = aReanimThreepeater->mAnimRate;
-			aReanimHead->SetFramesForLayer(StrFormat("anim_head_idle%d", i).c_str());
-			aReanimHead->AttachToAnotherReanimation(aReanimThreepeater, StrFormat("anim_head%d", i).c_str());
+			aReanimHead->SetFramesForLayer(std::format("anim_head_idle{}", i).c_str());
+			aReanimHead->AttachToAnotherReanimation(aReanimThreepeater, std::format("anim_head{}", i).c_str());
 		}
 		AttachEffect* anAttachEffect = AttachReanim(aCrazyDaveReanim->GetTrackInstanceByName("Dave_body1")->mAttachmentID, aReanimThreepeater, 0.0f, 0.0f);
 		PvzpScaleRotateTransformMatrix(anAttachEffect->mOffset, -70.0f, 260.0f, 0.5f, 1.2f, 1.2f);

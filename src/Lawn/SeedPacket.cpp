@@ -19,6 +19,7 @@
  * along with PvZ-Portable. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <format>
 #include "Board.h"
 #include "Cutscene.h"
 #include "Challenge.h"
@@ -567,16 +568,16 @@ void DrawSeedPacket(Graphics* g, float x, float y, SeedType theSeedType, SeedTyp
 		{
 			if (theUseCurrentCost)
 			{
-				aCostStr = StrFormat("%d", gLawnApp->mBoard->GetCurrentPlantCost(theSeedType, theImitaterType));
+				aCostStr = std::to_string(gLawnApp->mBoard->GetCurrentPlantCost(theSeedType, theImitaterType));
 			}
 			else
 			{
-				aCostStr = StrFormat("%d+", Plant::GetCost(theSeedType, theImitaterType));
+				aCostStr = std::format("{}+", Plant::GetCost(theSeedType, theImitaterType));
 			}
 		}
 		else
 		{
-			aCostStr = StrFormat("%d", Plant::GetCost(theSeedType, theImitaterType));
+			aCostStr = std::to_string(Plant::GetCost(theSeedType, theImitaterType));
 		}
 
 		_Font* aTextFont = Sexy::FONT_PICO129;
@@ -729,9 +730,8 @@ bool SeedPacket::CanPickUp()
 	return true;
 }
 
-void SeedPacket::MouseDown(int x, int y, int theClickCount)
+void SeedPacket::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int theClickCount)
 {
-	(void)x;(void)y;(void)theClickCount;
 	if (mBoard->mPaused || mApp->mGameScene != GameScenes::SCENE_PLAYING || mPacketType == SeedType::SEED_NONE)
 	{
 		return;
@@ -982,7 +982,7 @@ void SeedBank::Draw(Graphics* g)
 
 	if (!mBoard->HasConveyorBeltSeedBank())
 	{
-		std::string aMoneyLabel = StrFormat("%d", std::max(mBoard->mSunMoney, 0));
+		std::string aMoneyLabel = std::to_string(std::max(mBoard->mSunMoney, 0));
 		Color aMoneyColor(0, 0, 0);
 		if (mBoard->mOutOfMoneyCounter > 0 && mBoard->mOutOfMoneyCounter % 20 < 10)
 		{

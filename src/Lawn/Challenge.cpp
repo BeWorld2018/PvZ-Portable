@@ -54,6 +54,7 @@
 #include "widget/WidgetManager.h"
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
+#include <format>
 
 constexpr const int BEGHOULED_WINNING_SCORE = 75;
 constexpr const int SLOT_MACHINE_WINNING_SCORE = 2000;
@@ -569,11 +570,10 @@ void Challenge::StartLevel()
 	{
 		IZombieStart();
 	}
-	/* Unused
 	if (mApp->IsSquirrelLevel())
 	{
 		SquirrelStart();
-	}*/
+	}
 }
 
 int Challenge::BeghouledTwistValidMove(int theGridX, int theGridY, BeghouledBoardState* theBoardState)
@@ -1168,14 +1168,18 @@ int Challenge::MouseMove(int x, int y)
 	return false;
 }
 
-int Challenge::UpdateToolTip(int theX, int theY)
+int Challenge::UpdateToolTip(int theX, int theY, const HitResult* theHitResult)
 {
 	if (!mApp->IsSlotMachineLevel())
 		return false;
 
-	HitResult aHitResult;
-	mBoard->MouseHitTest(theX, theY, &aHitResult);
-	if (aHitResult.mObjectType != GameObjectType::OBJECT_TYPE_SLOT_MACHINE_HANDLE ||
+	HitResult aLocalHitResult;
+	if (theHitResult == nullptr)
+	{
+		mBoard->MouseHitTest(theX, theY, &aLocalHitResult);
+		theHitResult = &aLocalHitResult;
+	}
+	if (theHitResult->mObjectType != GameObjectType::OBJECT_TYPE_SLOT_MACHINE_HANDLE ||
 		mBoard->mCursorObject->mCursorType != CursorType::CURSOR_TYPE_NORMAL ||
 		mChallengeState != ChallengeState::STATECHALLENGE_NORMAL)
 		return false;
@@ -1353,9 +1357,8 @@ Rect Challenge::SlotMachineGetHandleRect()
 	return Rect(mBoard->mSeedBank->mX + 473, mBoard->mSeedBank->mY, 55, 80);
 }
 
-int Challenge::MouseUp(int x, int y)
+int Challenge::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y)
 {
-	(void)x;(void)y;
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_BEGHOULED)
 	{
 		if (mBeghouledMouseCapture && !mBoard->mAdvice->IsBeingDisplayed() && mChallengeScore == 0)
@@ -2208,11 +2211,10 @@ void Challenge::Update()
 	{
 		UpdatePortalCombat();
 	}
-	/* Unused
 	if (mApp->IsSquirrelLevel())
 	{
 		SquirrelUpdate();
-	}*/
+	}
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_ZOMBIQUARIUM)
 	{
 		ZombiquariumUpdate();
@@ -2901,7 +2903,7 @@ void Challenge::WhackAZombieSpawning()
 	}
 }
 
-int Challenge::UpdateZombieSpawning()
+bool Challenge::UpdateZombieSpawning()
 {
 	if (mApp->IsWhackAZombieLevel())
 	{
@@ -4874,13 +4876,10 @@ void Challenge::IZombieSquishBrain(GridItem* theBrain)
 	IZombieScoreBrain(theBrain);
 }
 
-/*
 int Challenge::SquirrelCountUncaught()
 {
 	int aCount = 0;
-
-	GridItem* aGridItem = nullptr;
-	while (mBoard->IterateGridItems(aGridItem))
+	for (GridItem* aGridItem : mBoard->mGridItems)
 	{
 		if (aGridItem->mGridItemType == GRIDITEM_SQUIRREL &&
 			aGridItem->mGridItemState != GRIDITEM_STATE_SQUIRREL_CAUGHT &&
@@ -4895,22 +4894,20 @@ int Challenge::SquirrelCountUncaught()
 
 void Challenge::SquirrelStart()
 {
-	int aPicksCount = 0;
 	PvzpWeightedGridArray aPicks[MAX_GRID_SIZE_X * (MAX_GRID_SIZE_Y - 1)];
+	int aPicksCount = 0;
 	for (int aCol = 0; aCol < MAX_GRID_SIZE_X; aCol++)
 	{
 		for (int aRow = 0; aRow < MAX_GRID_SIZE_Y - 1; aRow++)
 		{
-			aPicks[aPicksCount].mX = aCol;
-			aPicks[aPicksCount].mY = aRow;
-			aPicks[aPicksCount].mWeight = 1;
+			aPicks[aPicksCount] = { aCol, aRow, 1 };
 			aPicksCount++;
 		}
 	}
 
 	for (int aCount = MAX_SQUIRRELS; aCount > 0; aCount--)
 	{
-		PvzpWeightedGridArray* aGrid = PvzpPickFromWeightedGridArray(aPicks, 45);
+		PvzpWeightedGridArray* aGrid = PvzpPickFromWeightedGridArray(aPicks, aPicksCount);
 		aGrid->mWeight = 0;
 
 		GridItem* aSquirrel = mBoard->mGridItems.DataArrayAlloc();
@@ -4918,8 +4915,8 @@ void Challenge::SquirrelStart()
 		aSquirrel->mGridItemState = GRIDITEM_STATE_SQUIRREL_WAITING;
 		aSquirrel->mGridX = aGrid->mX;
 		aSquirrel->mGridY = aGrid->mY;
-		aSquirrel->mGridItemCounter = RandRangeInt(100, 400);
-		aSquirrel->mRenderOrder = mBoard->MakeRenderOrder(RENDER_LAYER_GRAVE_STONE, aSquirrel->mGridY, 1);
+		aSquirrel->mGridItemCounter = RandRangeInt(100, 500);
+		aSquirrel->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_GRAVE_STONE, aSquirrel->mGridY, 1);
 	}
 
 	for (int i = 0; i < aPicksCount; i++)
@@ -4930,18 +4927,18 @@ void Challenge::SquirrelStart()
 		}
 	}
 
-	PvzpWeightedGridArray* aGrid = PvzpPickFromWeightedGridArray(aPicks, 45);
-	GridItem* aSquirrel = mBoard->mGridItems.DataArrayAlloc();
-	aSquirrel->mGridItemType = GRIDITEM_SQUIRREL;
-	aSquirrel->mGridItemState = GRIDITEM_STATE_SQUIRREL_ZOMBIE;
-	aSquirrel->mGridX = aGrid->mX;
-	aSquirrel->mGridY = aGrid->mY;
-	aSquirrel->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_GRAVE_STONE, aGrid->mY, 1);
+	PvzpWeightedGridArray* aZombieGrid = PvzpPickFromWeightedGridArray(aPicks, aPicksCount);
+	GridItem* aZombieSquirrel = mBoard->mGridItems.DataArrayAlloc();
+	aZombieSquirrel->mGridItemType = GRIDITEM_SQUIRREL;
+	aZombieSquirrel->mGridItemState = GRIDITEM_STATE_SQUIRREL_ZOMBIE;
+	aZombieSquirrel->mGridX = aZombieGrid->mX;
+	aZombieSquirrel->mGridY = aZombieGrid->mY;
+	aZombieSquirrel->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_GRAVE_STONE, aZombieGrid->mY, 1);
 }
 
 void Challenge::SquirrelChew(GridItem* theSquirrel)
 {
-	theSquirrel->mGridItemCounter = RandRangeInt(100, 400);
+	theSquirrel->mGridItemCounter = RandRangeInt(100, 500);
 
 	Plant* aPlant = mBoard->GetTopPlantAt(theSquirrel->mGridX, theSquirrel->mGridY, TOPPLANT_EATING_ORDER);
 	if (aPlant)
@@ -4972,25 +4969,17 @@ void Challenge::SquirrelFound(GridItem* theSquirrel)
 	}
 	else
 	{
+		constexpr int aNeighborOffsets[4][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
 		PvzpWeightedGridArray aPicks[4];
 		int aPickCount = 0;
-		for (int i = 0; i < 4; i++)
+		for (const auto& aOffset : aNeighborOffsets)
 		{
-			int aGridX = theSquirrel->mGridX;
-			int aGridY = theSquirrel->mGridY;
-			switch (i)
+			int aGridX = theSquirrel->mGridX + aOffset[0];
+			int aGridY = theSquirrel->mGridY + aOffset[1];
+			if (!mBoard->GetGridItemAt(GRIDITEM_SQUIRREL, aGridX, aGridY) &&
+				mBoard->GetTopPlantAt(aGridX, aGridY, TOPPLANT_EATING_ORDER))
 			{
-			case 0: aGridX--; break;
-			case 1: aGridX++; break;
-			case 2: aGridY--; break;
-			case 3: aGridY++; break;
-			}
-
-			if (!mBoard->GetGridItemAt(GRIDITEM_SQUIRREL, aGridX, aGridY) && mBoard->GetTopPlantAt(aGridX, aGridY, TOPPLANT_EATING_ORDER))
-			{
-				aPicks[aPickCount].mX = aGridX;
-				aPicks[aPickCount].mY = aGridY;
-				aPicks[aPickCount].mWeight = 1;
+				aPicks[aPickCount] = { aGridX, aGridY, 1 };
 				aPickCount++;
 			}
 		}
@@ -4999,11 +4988,18 @@ void Challenge::SquirrelFound(GridItem* theSquirrel)
 		{
 			PvzpWeightedGridArray* aGrid = PvzpPickFromWeightedGridArray(aPicks, aPickCount);
 
-			theSquirrel->mGridItemState =
-				aGrid->mX < theSquirrel->mGridX ? GRIDITEM_STATE_SQUIRREL_RUNNING_LEFT :
-				aGrid->mX >= theSquirrel->mGridX ? GRIDITEM_STATE_SQUIRREL_RUNNING_RIGHT :
-				aGrid->mY < theSquirrel->mGridY ? GRIDITEM_STATE_SQUIRREL_RUNNING_UP : GRIDITEM_STATE_SQUIRREL_RUNNING_DOWN;
+			if (aGrid->mX != theSquirrel->mGridX)
+			{
+				theSquirrel->mGridItemState =
+					aGrid->mX < theSquirrel->mGridX ? GRIDITEM_STATE_SQUIRREL_RUNNING_LEFT : GRIDITEM_STATE_SQUIRREL_RUNNING_RIGHT;
+			}
+			else
+			{
+				theSquirrel->mGridItemState =
+					aGrid->mY < theSquirrel->mGridY ? GRIDITEM_STATE_SQUIRREL_RUNNING_UP : GRIDITEM_STATE_SQUIRREL_RUNNING_DOWN;
+			}
 
+			theSquirrel->mGridItemCounter = 50;
 			theSquirrel->mGridX = aGrid->mX;
 			theSquirrel->mGridY = aGrid->mY;
 			theSquirrel->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_GRAVE_STONE, aGrid->mY, 1);
@@ -5014,10 +5010,9 @@ void Challenge::SquirrelFound(GridItem* theSquirrel)
 			theSquirrel->mGridItemCounter = 100;
 
 			int aSquirrelsRemaining = SquirrelCountUncaught();
-			if (aSquirrelsRemaining)
+			if (aSquirrelsRemaining > 0)
 			{
-				std::string aMessage = mApp->Pluralize(aSquirrelsRemaining, "[ADVICE_SQUIRRELS_ONE_LEFT]", "[ADVICE_SQUIRRELS_LEFT]");
-				mBoard->DisplayAdvice(aMessage, MESSAGE_STYLE_HINT_FAST, ADVICE_NONE);
+				mBoard->DisplayAdvice(mApp->Pluralize(aSquirrelsRemaining, "[ADVICE_SQUIRRELS_ONE_LEFT]", "[ADVICE_SQUIRRELS_LEFT]"), MESSAGE_STYLE_HINT_FAST, ADVICE_NONE);
 			}
 			else
 			{
@@ -5032,11 +5027,14 @@ void Challenge::SquirrelUpdateOne(GridItem* theSquirrel)
 {
 	int& aCounter = theSquirrel->mGridItemCounter;
 	if (aCounter > 0)
+	{
 		aCounter--;
+	}
 
 	GridItemState& aState = theSquirrel->mGridItemState;
 	if (aState == GRIDITEM_STATE_SQUIRREL_WAITING || aState == GRIDITEM_STATE_SQUIRREL_ZOMBIE)
 	{
+		// a squirrel is uncovered once the plant sharing its cell is removed
 		if (!mBoard->GetTopPlantAt(theSquirrel->mGridX, theSquirrel->mGridY, TOPPLANT_EATING_ORDER))
 		{
 			SquirrelFound(theSquirrel);
@@ -5057,7 +5055,7 @@ void Challenge::SquirrelUpdateOne(GridItem* theSquirrel)
 	if (aState >= GRIDITEM_STATE_SQUIRREL_PEEKING && aState <= GRIDITEM_STATE_SQUIRREL_RUNNING_RIGHT && aCounter == 0)
 	{
 		aState = GRIDITEM_STATE_SQUIRREL_WAITING;
-		aCounter = RandRangeInt(100, 400);
+		aCounter = RandRangeInt(100, 500);
 	}
 	if (aState == GRIDITEM_STATE_SQUIRREL_CAUGHT && aCounter == 0)
 	{
@@ -5067,8 +5065,7 @@ void Challenge::SquirrelUpdateOne(GridItem* theSquirrel)
 
 void Challenge::SquirrelUpdate()
 {
-	GridItem* aGridItem;
-	while (mBoard->IterateGridItems(aGridItem))
+	for (GridItem* aGridItem : mBoard->mGridItems)
 	{
 		if (aGridItem->mGridItemType == GRIDITEM_SQUIRREL)
 		{
@@ -5079,7 +5076,6 @@ void Challenge::SquirrelUpdate()
 	mChallengeScore = MAX_SQUIRRELS - SquirrelCountUncaught();
 	mBoard->mProgressMeterWidth = PvzpAnimateCurve(0, MAX_SQUIRRELS, mChallengeScore, 0, PROGRESS_METER_COUNTER, CURVE_LINEAR);
 }
-*/
 
 void Challenge::UpdateRain()
 {
@@ -5095,16 +5091,14 @@ void Challenge::UpdateRain()
 
 		aPosX = RandRangeFloat(40.0f, 740.0f);
 		aPosY = RandRangeFloat(290.0f, 410.0f);
-		Reanimation* aCircleReanim = mApp->AddReanimation(aPosX, aPosY, RENDER_LAYER_GROUND, REANIM_RAIN_CIRCLE);
-		(void)aCircleReanim; // unused
+		mApp->AddReanimation(aPosX, aPosY, RENDER_LAYER_GROUND, REANIM_RAIN_CIRCLE);
 		aSplashReanim->mColorOverride = Color(255, 255, 255, RandRangeInt(50, 150));
 		aScale = RandRangeFloat(0.7f, 1.1f);
 		aSplashReanim->OverrideScale(aScale, aScale);
 
 		aPosX = RandRangeFloat(40.0f, 740.0f);
 		aPosY = RandRangeFloat(450.0f, 580.0f);
-		Reanimation* aRainReanim = mApp->AddReanimation(aPosX, aPosY, RENDER_LAYER_GROUND, REANIM_RAIN_SPLASH);
-		(void)aRainReanim; // unused
+		mApp->AddReanimation(aPosX, aPosY, RENDER_LAYER_GROUND, REANIM_RAIN_SPLASH);
 		aSplashReanim->mColorOverride = Color(255, 255, 255, RandRangeInt(100, 200));
 		aScale = RandRangeFloat(0.7f, 1.2f);
 		aSplashReanim->OverrideScale(aScale, aScale);
@@ -5117,7 +5111,7 @@ void Challenge::LastStandUpdate()
 {
 	if (mBoard->mNextSurvivalStageCounter == 0 && mChallengeState == STATECHALLENGE_NORMAL && mBoard->mStoreButton->mBtnNoDraw)
 	{
-		GameButton* aButton = mBoard->mStoreButton;
+		GameButton* aButton = mBoard->mStoreButton.get();
 		aButton->mBtnNoDraw = false;
 		aButton->mDisabled = false;
 
@@ -5251,7 +5245,7 @@ void Challenge::TreeOfWisdomDraw(Graphics* g)
 		}
 
 		g->DrawImage(Sexy::IMAGE_STORE_SPEECHBUBBLE2, aPosX, aPosY);
-		std::string aText = StrFormat("[TREE_OF_WISDOM_%d]", mTreeOfWisdomTalkIndex);
+		std::string aText = std::format("[TREE_OF_WISDOM_{}]", mTreeOfWisdomTalkIndex);
 		auto aWrapEnum = static_cast<DrawStringJustification>(mApp->GetInteger("TREE_OF_WISDOM_TEXT_WRAP_ENUM", DS_ALIGN_CENTER_VERTICAL_MIDDLE));
 		PvzpDrawStringWrapped(g, aText, Rect(aPosX + 25, aPosY + 6, 233, 144), Sexy::FONT_BRIANNETOD16, Color::Black, aWrapEnum);
 	}
@@ -5293,7 +5287,7 @@ void Challenge::TreeOfWisdomInit()
 	mReanimChallenge = mApp->ReanimationGetID(aReanimTree);
 
 	int aTreeSize = std::clamp(TreeOfWisdomGetSize(), 1, 50);
-	aReanimTree->PlayReanim(StrFormat("anim_grow%d", aTreeSize).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
+	aReanimTree->PlayReanim(std::format("anim_grow{}", aTreeSize).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
 	if (aTreeSize == 0 && mApp->mPlayerInfo->mPurchases[STORE_ITEM_TREE_FOOD] < PURCHASE_COUNT_OFFSET)
 	{
 		aReanimTree->mFrameCount += aReanimTree->mFrameStart;
@@ -5307,7 +5301,7 @@ void Challenge::TreeOfWisdomInit()
 	for (int i = 0; i < 6; i++)
 	{
 		Reanimation* aReanimCloud = mApp->AddReanimation(0, 0, 0, REANIM_TREEOFWISDOM_CLOUDS);
-		aReanimCloud->PlayReanim(StrFormat("Cloud%d", i + 1).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 0);
+		aReanimCloud->PlayReanim(std::format("Cloud{}", i + 1).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 0);
 		mReanimClouds[i] = mApp->ReanimationGetID(aReanimCloud);
 
 		int aCloudCounter = RandRangeInt(-6000, 2000);
@@ -5332,7 +5326,7 @@ void Challenge::TreeOfWisdomGrow()
 {
 	mApp->mPlayerInfo->mChallengeRecords[mApp->GetCurrentChallengeIndex()]++;
 	int aTreeSize = TreeOfWisdomGetSize();
-	mApp->ReanimationGet(mReanimChallenge)->PlayReanim(StrFormat("anim_grow%d", std::clamp(aTreeSize, 1, 51)).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 8.0f);
+	mApp->ReanimationGet(mReanimChallenge)->PlayReanim(std::format("anim_grow{}", std::clamp(aTreeSize, 1, 51)).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 8.0f);
 	mApp->PlayFoley(FOLEY_PLANTGROW);
 
 	if (aTreeSize > 1)

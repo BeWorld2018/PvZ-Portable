@@ -23,6 +23,7 @@
 #define __REANIMATION_H__
 
 #include <cstdint>
+#include <memory>
 #include "DataArray.h"
 #include "FilterEffect.h"
 #include "misc/SexyMatrix.h"
@@ -87,7 +88,7 @@ public:
 	ReanimatorDefinition() : mTracks({nullptr, 0}), mFPS(12.0f), mReanimAtlas(nullptr) { }
 };
 extern unsigned int gReanimatorDefCount;
-extern ReanimatorDefinition* gReanimatorDefArray;
+extern std::unique_ptr<ReanimatorDefinition[]> gReanimatorDefArray;
 
 // maps a reanimation type to its data file name and flags
 class ReanimationParams
@@ -220,8 +221,8 @@ public:
 	void                 Draw(Graphics* g);
 	void                            DrawAllRenderGroups(Graphics* g);
 	void                            DrawRenderGroup(Graphics* g, int theRenderGroup);
-	bool                            DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, PvzpTriangleGroup* theTriangleGroup);
-	void                            GetCurrentTransform(int theTrackIndex, ReanimatorTransform* theTransformCurrent);
+	bool                            DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, PvzpTriangleGroup* theTriangleGroup, ReanimatorFrameTime* theFrameTime = nullptr);
+	void                            GetCurrentTransform(int theTrackIndex, ReanimatorTransform* theTransformCurrent, ReanimatorFrameTime* theFrameTime = nullptr);
 	void                            GetTransformAtTime(int theTrackIndex, ReanimatorTransform* theTransform, ReanimatorFrameTime* theFrameTime);
 	void                            GetFrameTime(ReanimatorFrameTime* theFrameTime);
 	int                             FindTrackIndex(const char* theTrackName);

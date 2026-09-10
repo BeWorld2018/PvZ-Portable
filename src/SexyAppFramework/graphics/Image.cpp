@@ -35,7 +35,6 @@ Image::Image()
 	mNumRows = 1;
 	mNumCols = 1;
 
-	mAnimInfo = nullptr;
 	mDrawn = false;
 }
 
@@ -47,15 +46,10 @@ Image::Image(const Image& theImage) :
 {
 	mDrawn = false;
 	if (theImage.mAnimInfo != nullptr)
-		mAnimInfo = new AnimInfo(*theImage.mAnimInfo);
-	else
-		mAnimInfo = nullptr;
+		mAnimInfo = std::make_unique<AnimInfo>(*theImage.mAnimInfo);
 }
 
-Image::~Image()
-{
-	delete mAnimInfo;
-}
+Image::~Image() = default;
 
 int Image::GetWidth()
 {
@@ -65,16 +59,6 @@ int Image::GetWidth()
 int	Image::GetHeight()
 {
 	return mHeight;
-}
-
-int Image::GetCelHeight()
-{
-	return mHeight / mNumRows;
-}
-
-int Image::GetCelWidth()
-{
-	return mWidth / mNumCols;
 }
 
 Rect Image::GetCelRect(int theCel)
@@ -224,10 +208,9 @@ void Image::CopyAttributes(Image *from)
 {
 	mNumCols = from->mNumCols;
 	mNumRows = from->mNumRows;
-	delete mAnimInfo;
-	mAnimInfo = nullptr;
+	mAnimInfo.reset();
 	if (from->mAnimInfo != nullptr)
-		mAnimInfo = new AnimInfo(*from->mAnimInfo);
+		mAnimInfo = std::make_unique<AnimInfo>(*from->mAnimInfo);
 }
 
 Graphics* Image::GetGraphics()

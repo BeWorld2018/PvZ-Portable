@@ -43,6 +43,7 @@
 #include "../PvzpLib/PvzpStringFile.h"
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
+#include <format>
 
 constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_PEASHOOTER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 100, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "PEASHOOTER" },
@@ -754,7 +755,7 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon)
 		aHeadReanim->mAnimRate = 35.0f;
 		aHeadReanim->SetFramesForLayer("anim_shooting");
 
-		mShootingCounter = 33;
+		mShootingCounter = 35;
 		if (mSeedType == SeedType::SEED_REPEATER || mSeedType == SeedType::SEED_SPLITPEA || mSeedType == SeedType::SEED_LEFTPEATER)
 		{
 			aHeadReanim->mAnimRate = 45.0f;
@@ -1481,8 +1482,7 @@ Zombie* Plant::FindSquashTarget()
 
 void Plant::UpdateSquash()
 {
-	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
-	(void)aBodyReanim; // unused in Release mode
+	[[maybe_unused]] Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);  // unused in Release mode
 	PVZP_ASSERT(aBodyReanim);
 
 	if (mState == PlantState::STATE_NOTREADY)
@@ -1541,7 +1541,7 @@ void Plant::UpdateSquash()
 		}
 		else if (mState == PlantState::STATE_SQUASH_FALLING)
 		{
-			mY = PvzpAnimateCurve(10, 0, mStateCountdown, aDestY - 120, aDestY, PvzpCurves::CURVE_EASE_IN_OUT);
+			mY = PvzpAnimateCurve(10, 0, mStateCountdown, aDestY - 120, aDestY, PvzpCurves::CURVE_LINEAR);
 
 			if (mStateCountdown == 5)
 			{
@@ -2977,7 +2977,7 @@ Reanimation* Plant::AttachBlinkAnim(Reanimation* theReanimBody)
 
 	if (aAnimToAttach == nullptr)
 	{
-		PvzpTrace("Missing head anim");
+		PvzpLogLn("Missing head anim");
 		return nullptr;
 	}
 
@@ -3004,7 +3004,7 @@ Reanimation* Plant::AttachBlinkAnim(Reanimation* theReanimBody)
 	}
 	else
 	{
-		PvzpTrace("Missing anim_idle for blink");
+		PvzpLogLn("Missing anim_idle for blink");
 	}
 
 	aBlinkReanim->mFilterEffect = theReanimBody->mFilterEffect;
@@ -3537,6 +3537,7 @@ float PlantFlowerPotHeightOffset(SeedType theSeedType, float theFlowerPotScale)
 float PlantDrawHeightOffset(Board* theBoard, Plant* thePlant, SeedType theSeedType, int theCol, int theRow)
 {
 	float aHeightOffset = 0.0f;
+	Plant* aFlowerPot = theBoard ? theBoard->GetFlowerPotAt(theCol, theRow) : nullptr;
 
 	bool doFloating = false;
 	if (Plant::IsFlying(theSeedType))
@@ -3571,7 +3572,7 @@ float PlantDrawHeightOffset(Board* theBoard, Plant* thePlant, SeedType theSeedTy
 
 	if (theBoard && (thePlant == nullptr || !thePlant->mSquished))
 	{
-		Plant* aPot = theBoard->GetFlowerPotAt(theCol, theRow);
+		Plant* aPot = aFlowerPot;
 		if (aPot && !aPot->mSquished && theSeedType != SeedType::SEED_FLOWERPOT)
 		{
 			aHeightOffset += PlantFlowerPotHeightOffset(theSeedType, 1.0f);
@@ -3639,7 +3640,7 @@ float PlantDrawHeightOffset(Board* theBoard, Plant* thePlant, SeedType theSeedTy
 			aHeightOffset += 6.0f;
 		}
 
-		if (theBoard && theBoard->GetFlowerPotAt(theCol, theRow) && gLawnApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
+		if (aFlowerPot && gLawnApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 		{
 			aHeightOffset += 5.0f;
 		}
@@ -4262,9 +4263,8 @@ void Plant::BlowAwayFliers()
 			continue;
 		if (!aZombie->IsDeadOrDying())
 		{
-			// Verified as a pure function, safe to remove
-			// Rect aZombieRect = aZombie->GetZombieRect();
-			if (aZombie->IsFlying())
+			// Blow away only flying balloons here; balloons mid-pop are excluded
+			if (aZombie->mZombiePhase == ZombiePhase::PHASE_BALLOON_FLYING)
 			{
 				aZombie->mBlowingAway = true;
 			}
@@ -4596,7 +4596,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	{
 		int aOffsetX, aOffsetY;
 		GetPeaHeadOffset(aOffsetX, aOffsetY);
-		aOriginX = mX + aOffsetX - 57;
+		aOriginX = mX - aOffsetX + 27;
 		aOriginY = mY + aOffsetY - 33;
 	}
 	else if (mSeedType == SeedType::SEED_GATLINGPEA)
@@ -5037,15 +5037,15 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType)
 std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 {
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
-	std::string aName = StrFormat("[%s]", aPlantDef.mPlantName);
-	std::string aTranslatedName = PvzpStringTranslate(aName);
+	std::string aName = std::format("[{}]", aPlantDef.mPlantName);
+	std::string aTranslatedName(PvzpStringTranslate(aName));
 
 	if (theSeedType == SeedType::SEED_IMITATER && theImitaterType != SeedType::SEED_NONE)
 	{
 		const PlantDefinition& aImitaterDef = GetPlantDefinition(theImitaterType);
-		std::string aImitaterName = StrFormat("[%s]", aImitaterDef.mPlantName);
-		std::string aTranslatedImitaterName = PvzpStringTranslate(aImitaterName);
-		return StrFormat("%s %s", aTranslatedName.c_str(), aTranslatedImitaterName.c_str());
+		std::string aImitaterName = std::format("[{}]", aImitaterDef.mPlantName);
+		std::string aTranslatedImitaterName(PvzpStringTranslate(aImitaterName));
+		return std::format("{} {}", aTranslatedName, aTranslatedImitaterName);
 	}
 
 	return aTranslatedName;
@@ -5054,8 +5054,8 @@ std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 std::string Plant::GetToolTip(SeedType theSeedType)
 {
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
-	std::string aToolTip = StrFormat("[%s_TOOLTIP]", aPlantDef.mPlantName);
-	return PvzpStringTranslate(aToolTip);
+	std::string aToolTip = std::format("[{}_TOOLTIP]", aPlantDef.mPlantName);
+	return std::string(PvzpStringTranslate(aToolTip));
 }
 
 int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType)

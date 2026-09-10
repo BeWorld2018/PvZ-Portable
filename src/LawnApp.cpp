@@ -20,6 +20,9 @@
  */
 
 #include <time.h>
+#include <cstdarg>
+#include <cstdio>
+#include <format>
 #include "LawnApp.h"
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
@@ -111,28 +114,9 @@ bool LawnHasUsedCheatKeys()
 LawnApp::LawnApp()
 {
 	// Replace the base-class resource manager with the PvZP-capable subclass.
-	delete mResourceManager;
-	mResourceManager = new PvzpResourceManager(this);
+	mResourceManager = std::make_unique<PvzpResourceManager>(this);
 
 	mBoard = nullptr;
-	mGameSelector = nullptr;
-	mChallengeScreen = nullptr;
-	mSeedChooserScreen = nullptr;
-	mAwardScreen = nullptr;
-	mCreditScreen = nullptr;
-	mTitleScreen = nullptr;
-	mSoundSystem = nullptr;
-	mMusic = nullptr;
-	mKonamiCheck = nullptr;
-	mMustacheCheck = nullptr;
-	mMoustacheCheck = nullptr;
-	mSuperMowerCheck = nullptr;
-	mSuperMowerCheck2 = nullptr;
-	mFutureCheck = nullptr;
-	mPinataCheck = nullptr;
-	mDanceCheck = nullptr;
-	mDaisyCheck = nullptr;
-	mSukhbirCheck = nullptr;
 	mMustacheMode = false;
 	mSuperMowerMode = false;
 	mFutureMode = false;
@@ -141,10 +125,6 @@ LawnApp::LawnApp()
 	mDaisyMode = false;
 	mSukhbirMode = false;
 	mGameScene = GameScenes::SCENE_LOADING;
-	mPoolEffect = nullptr;
-	mZenGarden = nullptr;
-	mEffectSystem = nullptr;
-	mReanimatorCache = nullptr;
 	mCloseRequest = false;
 	mWidth = BOARD_WIDTH;
 	mHeight = BOARD_HEIGHT;
@@ -166,7 +146,7 @@ LawnApp::LawnApp()
 	mTitle = aTitleName;
 	mCustomCursorsEnabled = false;
 	mPlayerInfo = nullptr;
-	mLastLevelStats = new LevelStats();
+	mLastLevelStats = std::make_unique<LevelStats>();
 	mFirstTimeGameSelector = true;
 	mGameMode = GameMode::GAMEMODE_ADVENTURE;
 	mEasyPlantingCheat = false;
@@ -178,7 +158,7 @@ LawnApp::LawnApp()
 	mMaxPlays = 0;
 	mMaxTime = 0;
 	mCompletedLoadingThreadTasks = 0;
-	mProfileMgr = new ProfileMgr();
+	mProfileMgr = std::make_unique<ProfileMgr>();
 	mRegisterResourcesLoaded = false;
 	mCheatKeys = false;
 	mCrazyDaveReanimID = ReanimationID::REANIMATIONID_NULL;
@@ -205,99 +185,34 @@ LawnApp::~LawnApp()
 
 	if (mTitleScreen)
 	{
-		mWidgetManager->RemoveWidget(mTitleScreen);
-		delete mTitleScreen;
-	}
-
-	delete mSoundSystem;
-	delete mMusic;
-
-	if (mKonamiCheck)
-	{
-		delete mKonamiCheck;
-	}
-	if (mMustacheCheck)
-	{
-		delete mMustacheCheck;
-	}
-	if (mMoustacheCheck)
-	{
-		delete mMoustacheCheck;
-	}
-	if (mSuperMowerCheck)
-	{
-		delete mSuperMowerCheck;
-	}
-	if (mSuperMowerCheck2)
-	{
-		delete mSuperMowerCheck2;
-	}
-	if (mFutureCheck)
-	{
-		delete mFutureCheck;
-	}
-	if (mPinataCheck)
-	{
-		delete mPinataCheck;
-	}
-	if (mDanceCheck)
-	{
-		delete mDanceCheck;
-	}
-	if (mDaisyCheck)
-	{
-		delete mDaisyCheck;
-	}
-	if (mSukhbirCheck)
-	{
-		delete mSukhbirCheck;
+		mWidgetManager->RemoveWidget(mTitleScreen.get());
 	}
 
 	if (mGameSelector)
 	{
-		mWidgetManager->RemoveWidget(mGameSelector);
-		delete mGameSelector;
+		mWidgetManager->RemoveWidget(mGameSelector.get());
 	}
 	if (mChallengeScreen)
 	{
-		mWidgetManager->RemoveWidget(mChallengeScreen);
-		delete mChallengeScreen;
+		mWidgetManager->RemoveWidget(mChallengeScreen.get());
 	}
 	if (mSeedChooserScreen)
 	{
-		mWidgetManager->RemoveWidget(mSeedChooserScreen);
-		delete mSeedChooserScreen;
+		mWidgetManager->RemoveWidget(mSeedChooserScreen.get());
 	}
 	if (mAwardScreen)
 	{
-		mWidgetManager->RemoveWidget(mAwardScreen);
-		delete mAwardScreen;
+		mWidgetManager->RemoveWidget(mAwardScreen.get());
 	}
 	if (mCreditScreen)
 	{
-		mWidgetManager->RemoveWidget(mCreditScreen);
-		delete mCreditScreen;
+		mWidgetManager->RemoveWidget(mCreditScreen.get());
 	}
 
-	if (mPoolEffect)
-	{
-		delete mPoolEffect;
-	}
-
-	if (mZenGarden)
-	{
-		delete mZenGarden;
-	}
-
-	if (mEffectSystem)
-	{
-		delete mEffectSystem;
-	}
-
-	if (mReanimatorCache)
-	{
-		delete mReanimatorCache;
-	}
+	// Must die before the definition tables and allocators are freed below.
+	mGameSelector.reset();
+	mEffectSystem.reset();
+	mReanimatorCache.reset();
 
 	FilterEffectDisposeForApp();
 	PvzpParticleFreeDefinitions();
@@ -305,9 +220,6 @@ LawnApp::~LawnApp()
 	TrailFreeDefinitions();
 	FreeGlobalAllocators();
 	UpdateRegisterInfo();
-
-	delete mProfileMgr;
-	delete mLastLevelStats;
 
 	mResourceManager->DeleteResources("");
 }
@@ -528,16 +440,16 @@ void LawnApp::ShowGameSelector()
 	//UpdateRegisterInfo();
 	if (mGameSelector)
 	{
-		mWidgetManager->RemoveWidget(mGameSelector);
-		SafeDeleteWidget(mGameSelector);
+		mWidgetManager->RemoveWidget(mGameSelector.get());
+		SafeDeleteWidget(mGameSelector.release());
 	}
 
 	mGameScene = GameScenes::SCENE_MENU;
-	mGameSelector = new GameSelector(this);
+	mGameSelector = std::make_unique<GameSelector>(this);
 	mGameSelector->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mGameSelector);
-	mWidgetManager->BringToBack(mGameSelector);
-	mWidgetManager->SetFocus(mGameSelector);
+	mWidgetManager->AddWidget(mGameSelector.get());
+	mWidgetManager->BringToBack(mGameSelector.get());
+	mWidgetManager->SetFocus(mGameSelector.get());
 
 	//if (NeedRegister())
 	//{
@@ -549,68 +461,64 @@ void LawnApp::KillGameSelector()
 {
 	if (mGameSelector)
 	{
-		mWidgetManager->RemoveWidget(mGameSelector);
-		SafeDeleteWidget(mGameSelector);
-		mGameSelector = nullptr;
+		mWidgetManager->RemoveWidget(mGameSelector.get());
+		SafeDeleteWidget(mGameSelector.release());
 	}
 }
 
 void LawnApp::ShowAwardScreen(AwardType theAwardType, bool theShowAchievements)
 {
 	mGameScene = GameScenes::SCENE_AWARD;
-	mAwardScreen = new AwardScreen(this, theAwardType, theShowAchievements);
+	mAwardScreen = std::make_unique<AwardScreen>(this, theAwardType, theShowAchievements);
 	mAwardScreen->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mAwardScreen);
-	mWidgetManager->BringToBack(mAwardScreen);
-	mWidgetManager->SetFocus(mAwardScreen);
+	mWidgetManager->AddWidget(mAwardScreen.get());
+	mWidgetManager->BringToBack(mAwardScreen.get());
+	mWidgetManager->SetFocus(mAwardScreen.get());
 }
 
 void LawnApp::KillAwardScreen()
 {
 	if (mAwardScreen)
 	{
-		mWidgetManager->RemoveWidget(mAwardScreen);
-		SafeDeleteWidget(mAwardScreen);
-		mAwardScreen = nullptr;
+		mWidgetManager->RemoveWidget(mAwardScreen.get());
+		SafeDeleteWidget(mAwardScreen.release());
 	}
 }
 
 void LawnApp::ShowCreditScreen()
 {
-	mCreditScreen = new CreditScreen(this);
+	mCreditScreen = std::make_unique<CreditScreen>(this);
 	mCreditScreen->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mCreditScreen);
-	mWidgetManager->BringToBack(mCreditScreen);
-	mWidgetManager->SetFocus(mCreditScreen);
+	mWidgetManager->AddWidget(mCreditScreen.get());
+	mWidgetManager->BringToBack(mCreditScreen.get());
+	mWidgetManager->SetFocus(mCreditScreen.get());
 }
 
 void LawnApp::KillCreditScreen()
 {
 	if (mCreditScreen)
 	{
-		mWidgetManager->RemoveWidget(mCreditScreen);
-		SafeDeleteWidget(mCreditScreen);
-		mCreditScreen = nullptr;
+		mWidgetManager->RemoveWidget(mCreditScreen.get());
+		SafeDeleteWidget(mCreditScreen.release());
 	}
 }
 
 void LawnApp::ShowChallengeScreen(ChallengePage thePage)
 {
 	mGameScene = GameScenes::SCENE_CHALLENGE;
-	mChallengeScreen = new ChallengeScreen(this, thePage);
+	mChallengeScreen = std::make_unique<ChallengeScreen>(this, thePage);
 	mChallengeScreen->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mChallengeScreen);
-	mWidgetManager->BringToBack(mChallengeScreen);
-	mWidgetManager->SetFocus(mChallengeScreen);
+	mWidgetManager->AddWidget(mChallengeScreen.get());
+	mWidgetManager->BringToBack(mChallengeScreen.get());
+	mWidgetManager->SetFocus(mChallengeScreen.get());
 }
 
 void LawnApp::KillChallengeScreen()
 {
 	if (mChallengeScreen)
 	{
-		mWidgetManager->RemoveWidget(mChallengeScreen);
-		SafeDeleteWidget(mChallengeScreen);
-		mChallengeScreen = nullptr;
+		mWidgetManager->RemoveWidget(mChallengeScreen.get());
+		SafeDeleteWidget(mChallengeScreen.release());
 	}
 }
 
@@ -639,19 +547,18 @@ void LawnApp::ShowSeedChooserScreen()
 {
 	PVZP_ASSERT(mSeedChooserScreen == nullptr);
 
-	mSeedChooserScreen = new SeedChooserScreen();
+	mSeedChooserScreen = std::make_unique<SeedChooserScreen>();
 	mSeedChooserScreen->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mSeedChooserScreen);
-	mWidgetManager->BringToBack(mSeedChooserScreen);
+	mWidgetManager->AddWidget(mSeedChooserScreen.get());
+	mWidgetManager->BringToBack(mSeedChooserScreen.get());
 }
 
 void LawnApp::KillSeedChooserScreen()
 {
 	if (mSeedChooserScreen)
 	{
-		mWidgetManager->RemoveWidget(mSeedChooserScreen);
-		SafeDeleteWidget(mSeedChooserScreen);
-		mSeedChooserScreen = nullptr;
+		mWidgetManager->RemoveWidget(mSeedChooserScreen.get());
+		SafeDeleteWidget(mSeedChooserScreen.release());
 	}
 }
 
@@ -739,7 +646,7 @@ AlmanacDialog* LawnApp::DoAlmanacDialog(SeedType theSeedType, ZombieType theZomb
 	}
 
 	int aDuration = mTimer.GetDuration();
-	PvzpTrace("almanac load time: %d ms", aDuration);
+	PvzpLogLn("almanac load time: {} ms", aDuration);
 
 	return aDialog;
 }
@@ -796,9 +703,9 @@ int LawnApp::LawnMessageBox(int theDialogId, const char* theHeaderName, const ch
 
 Dialog* LawnApp::DoDialog(int theDialogId, bool isModal, const std::string& theDialogHeader, const std::string& theDialogLines, const std::string& theDialogFooter, int theButtonMode)
 {
-	std::string aHeader = PvzpStringTranslate(theDialogHeader);
-	std::string aLines = PvzpStringTranslate(theDialogLines);
-	std::string aFooter = PvzpStringTranslate(theDialogFooter);
+	std::string aHeader(PvzpStringTranslate(theDialogHeader));
+	std::string aLines(PvzpStringTranslate(theDialogLines));
+	std::string aFooter(PvzpStringTranslate(theDialogFooter));
 
 	Dialog* aDialog = SexyAppBase::DoDialog(theDialogId, isModal, aHeader, aLines, aFooter, theButtonMode);
 	if (mWidgetManager->mFocusWidget == nullptr)
@@ -927,6 +834,38 @@ void LawnApp::FinishCreateUserDialog(bool isYes)
 	}
 }
 
+std::string LawnApp::GetFormattedString(std::string_view theComponentId, std::string_view theDefault, ...)
+{
+	std::string aFormat = GetString(theComponentId, theDefault);
+
+	va_list args;
+	va_start(args, theDefault);
+
+	va_list argsCopy;
+	va_copy(argsCopy, args);
+#ifdef _WIN32
+	int required = _vscprintf(aFormat.c_str(), argsCopy);
+#else
+	int required = vsnprintf(nullptr, 0, aFormat.c_str(), argsCopy);
+#endif
+	va_end(argsCopy);
+
+	std::string aResult;
+	if (required > 0)
+	{
+		aResult.resize((size_t)required + 1);
+#ifdef _WIN32
+		_vsnprintf(aResult.data(), (size_t)required + 1, aFormat.c_str(), args);
+#else
+		vsnprintf(aResult.data(), (size_t)required + 1, aFormat.c_str(), args);
+#endif
+		aResult.resize((size_t)required);
+	}
+
+	va_end(args);
+	return aResult;
+}
+
 void LawnApp::DoConfirmDeleteUserDialog(const std::string& theName)
 {
 	KillDialog(Dialogs::DIALOG_CONFIRMDELETEUSER);
@@ -934,9 +873,7 @@ void LawnApp::DoConfirmDeleteUserDialog(const std::string& theName)
 		Dialogs::DIALOG_CONFIRMDELETEUSER,
 		true,
 		GetString("ARE_YOU_SURE", "Are You Sure?"),
-		StrFormat(
-			GetString("DELETE_USER_WARNING", "This will permanently remove '%s' from the player roster!").c_str(),
-			theName.c_str()),
+		GetFormattedString("DELETE_USER_WARNING", "This will permanently remove '%s' from the player roster!", theName.c_str()),
 		"",
 		Dialog::BUTTONS_YES_NO
 	);
@@ -1048,7 +985,7 @@ void LawnApp::FinishNameError(int theId)
 	NewUserDialog* aNewUserDialog = (NewUserDialog*)GetDialog(theId == Dialogs::DIALOG_CREATEUSERERROR ? Dialogs::DIALOG_CREATEUSER : Dialogs::DIALOG_RENAMEUSER);
 	if (aNewUserDialog)
 	{
-		mWidgetManager->SetFocus(aNewUserDialog->mNameEditWidget);
+		mWidgetManager->SetFocus(aNewUserDialog->mNameEditWidget.get());
 	}
 }
 
@@ -1188,7 +1125,7 @@ bool LawnApp::KillDialog(int theDialogId)
 			}
 			else if (mGameSelector)
 			{
-				mWidgetManager->SetFocus(mGameSelector);
+				mWidgetManager->SetFocus(mGameSelector.get());
 			}
 		}
 
@@ -1230,11 +1167,12 @@ void LawnApp::Init()
 	if (mRecordingDemoBuffer || mPlayingDemoBuffer)
 		mAppRandSeed = mRandSeed; // demo sessions derive the app-level seed from the recorded one
 
-	// these debug checks break the whole exe in release mode
-//#ifdef PVZ_DEBUG
-	PvzpAssertInitForApp();
-	PvzpLogLn("session id: %u", mSessionID);
-//#endif
+	Sexy::MkDir(Sexy::GetAppDataPath("userdata"));
+#ifdef PVZ_DEBUG
+	Sexy::RegisterLogFileSink(Sexy::GetAppDataPath("userdata/") + "log.txt");
+	PvzpLogLn("Started {}", static_cast<uint64_t>(std::time(nullptr)));
+#endif
+	PvzpLogLn("session id: {}", static_cast<long long>(mSessionID));
 
 	if (!mResourceManager->ParseResourcesFile("properties/resources.xml"))
 	{
@@ -1266,23 +1204,23 @@ void LawnApp::Init()
 	mMaxPlays = GetInteger("MaxPlays", 0);
 	mMaxTime = GetInteger("MaxTime", 60);
 
-	mTitleScreen = new TitleScreen(this);
+	mTitleScreen = std::make_unique<TitleScreen>(this);
 	mTitleScreen->Resize(0, 0, mWidth, mHeight);
-	mWidgetManager->AddWidget(mTitleScreen);
-	mWidgetManager->SetFocus(mTitleScreen);
+	mWidgetManager->AddWidget(mTitleScreen.get());
+	mWidgetManager->SetFocus(mTitleScreen.get());
 
 #ifdef PVZ_DEBUG
 	int aDuration = mTimer.GetDuration();
-	PvzpTrace("loading: 'profiles' %d ms", aDuration);
+	PvzpLogLn("loading: 'profiles' {} ms", aDuration);
 #endif
 	mTimer.Start();
 
-	mMusic = new Music();
-	mSoundSystem = new PvzpFoley();
-	mEffectSystem = new EffectSystem();
+	mMusic = std::make_unique<Music>();
+	mSoundSystem = std::make_unique<PvzpFoley>();
+	mEffectSystem = std::make_unique<EffectSystem>();
 	mEffectSystem->EffectSystemInitialize();
 
-	mKonamiCheck = new TypingCheck();
+	mKonamiCheck = std::make_unique<TypingCheck>();
 	mKonamiCheck->AddKeyCode(KeyCode::KEYCODE_UP);
 	mKonamiCheck->AddKeyCode(KeyCode::KEYCODE_UP);
 	mKonamiCheck->AddKeyCode(KeyCode::KEYCODE_DOWN);
@@ -1293,19 +1231,19 @@ void LawnApp::Init()
 	mKonamiCheck->AddKeyCode(KeyCode::KEYCODE_RIGHT);
 	mKonamiCheck->AddChar('b');
 	mKonamiCheck->AddChar('a');
-	mMustacheCheck = new TypingCheck("mustache");
-	mMoustacheCheck = new TypingCheck("moustache");
-	mSuperMowerCheck = new TypingCheck("trickedout");
-	mSuperMowerCheck2 = new TypingCheck("tricked out");
-	mFutureCheck = new TypingCheck("future");
-	mPinataCheck = new TypingCheck("pinata");
-	mDanceCheck = new TypingCheck("dance");
-	mDaisyCheck = new TypingCheck("daisies");
-	mSukhbirCheck = new TypingCheck("sukhbir");
+	mMustacheCheck = std::make_unique<TypingCheck>("mustache");
+	mMoustacheCheck = std::make_unique<TypingCheck>("moustache");
+	mSuperMowerCheck = std::make_unique<TypingCheck>("trickedout");
+	mSuperMowerCheck2 = std::make_unique<TypingCheck>("tricked out");
+	mFutureCheck = std::make_unique<TypingCheck>("future");
+	mPinataCheck = std::make_unique<TypingCheck>("pinata");
+	mDanceCheck = std::make_unique<TypingCheck>("dance");
+	mDaisyCheck = std::make_unique<TypingCheck>("daisies");
+	mSukhbirCheck = std::make_unique<TypingCheck>("sukhbir");
 
 #ifdef PVZ_DEBUG
 	aDuration = mTimer.GetDuration();
-	PvzpTrace("loading: 'system' %d ms", aDuration);
+	PvzpLogLn("loading: 'system' {} ms", aDuration);
 #endif
 	mTimer.Start();
 
@@ -1315,7 +1253,7 @@ void LawnApp::Init()
 
 #ifdef PVZ_DEBUG
 	aDuration = mTimer.GetDuration();
-	PvzpTrace("loading: 'loaderbar' %d ms", aDuration);
+	PvzpLogLn("loading: 'loaderbar' {} ms", aDuration);
 #endif
 	mTimer.Start();
 }
@@ -1687,7 +1625,7 @@ void LawnApp::LoadGroup(const char* theGroupName, int theGroupAveMsToLoad)
 	if (mShutdown || mCloseRequest)
 		return;
 
-	if (mResourceManager->HadError() || !ExtractResourcesByName(mResourceManager, theGroupName))
+	if (mResourceManager->HadError() || !ExtractResourcesByName(mResourceManager.get(), theGroupName))
 	{
 		ShowResourceError();
 		mLoadingFailed = true;
@@ -1724,9 +1662,7 @@ void LawnApp::LoadingThreadProc()
 	PerfTimer aTimer;
 	aTimer.Start();
 
-	PvzpHesitationTrace("start loading");
 	PvzpHesitationBracket aHesitationResources("Resources");
-	PvzpHesitationTrace("loading thread start");
 
 	LoadGroup("LoadingImages", 9);
 	LoadGroup("LoadingFonts", 54);
@@ -1735,27 +1671,26 @@ void LawnApp::LoadingThreadProc()
 	mDefaultFont = FONT_PICO129; // framework widgets fall back to this when no font is set
 
 	aHesitationResources.EndBracket();
-	PvzpTrace("loading '%s' %d ms", "resources", static_cast<int>(aTimer.GetDuration()));
+	PvzpLogLn("loading '{}' {} ms", "resources", static_cast<int>(aTimer.GetDuration()));
 
 	mMusic->MusicInit();
 	// aDuration goes unused
 	//int aDuration = max(aTimer.GetDuration(), 0.0);
 	aTimer.Start();
 
-	mPoolEffect = new PoolEffect();
+	mPoolEffect = std::make_unique<PoolEffect>();
 	mPoolEffect->PoolEffectInitialize();
-	mZenGarden = new ZenGarden();
-	mReanimatorCache = new ReanimatorCache();
+	mZenGarden = std::make_unique<ZenGarden>();
+	mReanimatorCache = std::make_unique<ReanimatorCache>();
 	mReanimatorCache->ReanimatorCacheInitialize();
 	PvzpFoleyInitialize(gLawnFoleyParamArray, LENGTH(gLawnFoleyParamArray));
 
-	PvzpTrace("loading '%s' %d ms", "stuff", static_cast<int>(aTimer.GetDuration()));
+	PvzpLogLn("loading '{}' {} ms", "stuff", static_cast<int>(aTimer.GetDuration()));
 	aTimer.Start();
 
 	TrailLoadDefinitions(gLawnTrailArray, LENGTH(gLawnTrailArray));
-	PvzpTrace("loading '%s' %d ms", "trail", static_cast<int>(aTimer.GetDuration()));
+	PvzpLogLn("loading '{}' {} ms", "trail", static_cast<int>(aTimer.GetDuration()));
 	aTimer.Start();
-	PvzpHesitationTrace("trail");
 
 	PvzpParticleLoadDefinitions(gLawnParticleArray, LENGTH(gLawnParticleArray));
 	//aDuration = max(aTimer.GetDuration(), 0.0);
@@ -1770,16 +1705,14 @@ void LawnApp::LoadingThreadProc()
 
 	GetNumPreloadingTasks();
 	LoadGroup("LoadingSounds", 54);
-	PvzpHesitationTrace("finished loading");
 }
 
 void LawnApp::FastLoad(GameMode theGameMode)
 {
 	if (!mShutdown)
 	{
-		mWidgetManager->RemoveWidget(mTitleScreen);
-		SafeDeleteWidget(mTitleScreen);
-		mTitleScreen = nullptr;
+		mWidgetManager->RemoveWidget(mTitleScreen.get());
+		SafeDeleteWidget(mTitleScreen.release());
 
 		PreNewGame(theGameMode, false);
 	}
@@ -1791,9 +1724,8 @@ void LawnApp::LoadingThreadCompleted()
 
 void LawnApp::LoadingCompleted()
 {
-	mWidgetManager->RemoveWidget(mTitleScreen);
-	SafeDeleteWidget(mTitleScreen);
-	mTitleScreen = nullptr;
+	mWidgetManager->RemoveWidget(mTitleScreen.get());
+	SafeDeleteWidget(mTitleScreen.release());
 
 	mResourceManager->DeleteImage("IMAGE_TITLESCREEN");
 
@@ -1807,9 +1739,7 @@ void LawnApp::URLOpenFailed(const std::string& theURL)
 	CopyToClipboard(theURL);
 
 	std::string aString =
-		StrFormat(
-			GetString("OPEN_URL", "Please open the following URL in your browser\n\n%s\n\nFor your convenience, this URL has already been copied to your clipboard.").c_str(),
-			theURL.c_str());
+		GetFormattedString("OPEN_URL", "Please open the following URL in your browser\n\n%s\n\nFor your convenience, this URL has already been copied to your clipboard.", theURL.c_str());
 
 	DoDialog(Dialogs::DIALOG_OPENURL_WAIT, true, GetString("OPEN_BROWSER", "Open Browser"), "[DIALOG_BUTTON_OK]", aString, Dialog::BUTTONS_FOOTER);
 }
@@ -1838,8 +1768,8 @@ bool LawnApp::OpenURL(const std::string& theURL, bool shutdownOnOpen)
 
 void LawnApp::ConfirmQuit()
 {
-	std::string aBody = PvzpStringTranslate("[QUIT_MESSAGE]");
-	std::string aHeader = PvzpStringTranslate("[QUIT_HEADER]");
+	std::string aBody(PvzpStringTranslate("[QUIT_MESSAGE]"));
+	std::string aHeader(PvzpStringTranslate("[QUIT_HEADER]"));
 	LawnDialog* aDialog = (LawnDialog*)DoDialog(Dialogs::DIALOG_QUIT, true, aHeader, aBody, "", Dialog::BUTTONS_OK_CANCEL);
 	aDialog->mLawnYesButton->mLabel = PvzpStringTranslate("[QUIT_BUTTON]");
 	CenterDialog(aDialog, aDialog->mWidth, aDialog->mHeight);
@@ -2041,7 +1971,7 @@ std::string LawnApp::GetStageString(int theLevel)
 {
 	int aArea = std::clamp((theLevel - 1) / LEVELS_PER_AREA + 1, 1, ADVENTURE_AREAS + 1);
 	int aSub = theLevel - (aArea - 1) * LEVELS_PER_AREA;
-	return StrFormat("%d-%d", aArea, aSub);
+	return std::format("{}-{}", aArea, aSub);
 }
 
 bool LawnApp::IsAdventureMode()
@@ -2430,7 +2360,7 @@ void LawnApp::RemoveParticle(ParticleSystemID theParticleID)
 
 bool LawnApp::AdvanceCrazyDaveText()
 {
-	std::string aMessageName = StrFormat("[CRAZY_DAVE_%d]", mCrazyDaveMessageIndex + 1);
+	std::string aMessageName = std::format("[CRAZY_DAVE_{}]", mCrazyDaveMessageIndex + 1);
 	if (!PvzpStringListExists(aMessageName))
 	{
 		return false;
@@ -2442,7 +2372,7 @@ bool LawnApp::AdvanceCrazyDaveText()
 
 std::string LawnApp::GetCrazyDaveText(int theMessageIndex)
 {
-	std::string aMessage = StrFormat("[CRAZY_DAVE_%d]", theMessageIndex);
+	std::string aMessage = std::format("[CRAZY_DAVE_{}]", theMessageIndex);
 	aMessage = PvzpReplaceString(aMessage, "{PLAYER_NAME}", mPlayerInfo->mName);
 	aMessage = PvzpReplaceString(aMessage, "{MONEY}", GetMoneyString(mPlayerInfo->mCoins));
 	int aCost = StoreScreen::GetItemCost(StoreItem::STORE_ITEM_PACKET_UPGRADE);
@@ -2594,7 +2524,7 @@ void LawnApp::CrazyDaveDoneHanding()
 	ReanimatorTrackInstance* aHandTrackInstance = aCrazyDaveReanim->GetTrackInstanceByName("Dave_handinghand");
 	AttachmentDie(aHandTrackInstance->mAttachmentID);
 
-	PvzpTrace("DoneHanding");
+	PvzpLogLn("DoneHanding");
 }
 
 void LawnApp::CrazyDaveStopSound()
@@ -2712,7 +2642,7 @@ void LawnApp::CrazyDaveTalkMessage(const std::string& theMessage)
 
 			Reanimation* aWallnutReanim = AddReanimation(0.0f, 0.0f, 0, ReanimationType::REANIM_WALLNUT);
 			aWallnutReanim->PlayReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 0, 12.0f);
-			PvzpTrace("Handed");
+			PvzpLogLn("Handed");
 
 			ReanimatorTrackInstance* aHandTrackInstance = aCrazyDaveReanim->GetTrackInstanceByName("Dave_handinghand");
 			AttachEffect* aAttachEffect = AttachReanim(aHandTrackInstance->mAttachmentID, aWallnutReanim, 100.0f, 393.0f);
@@ -3049,7 +2979,7 @@ void LawnApp::PreloadForUser()
 	int aNumTasks = mCompletedLoadingThreadTasks + GetNumPreloadingTasks();
 	if (mTitleScreen && mTitleScreen->mQuickLoadKey != KeyCode::KEYCODE_UNKNOWN)
 	{
-		PvzpTrace("preload canceled\n");
+		PvzpLogLn("preload canceled");
 		mNumLoadingThreadTasks = aNumTasks;
 		return;
 	}
@@ -3086,7 +3016,7 @@ void LawnApp::PreloadForUser()
 
 				if (mTitleScreen && mTitleScreen->mQuickLoadKey != KeyCode::KEYCODE_UNKNOWN)
 				{
-					PvzpTrace("preload canceled\n");
+					PvzpLogLn("preload canceled");
 					mNumLoadingThreadTasks = aNumTasks;
 					return;
 				}
@@ -3118,7 +3048,7 @@ void LawnApp::PreloadForUser()
 
 			if (mTitleScreen && mTitleScreen->mQuickLoadKey != KeyCode::KEYCODE_UNKNOWN)
 			{
-				PvzpTrace("preload canceled\n");
+				PvzpLogLn("preload canceled");
 				mNumLoadingThreadTasks = aNumTasks;
 				return;
 			}
@@ -3133,7 +3063,7 @@ void LawnApp::PreloadForUser()
 
 	if (mCompletedLoadingThreadTasks != aNumTasks)
 	{
-		PvzpTrace("num preload tasks wasn't calculated correctly");
+		PvzpLogLn("num preload tasks wasn't calculated correctly");
 		mCompletedLoadingThreadTasks = aNumTasks;
 	}
 }
@@ -3199,15 +3129,15 @@ std::string LawnApp::GetMoneyString(int theAmount)
 	int aValue = theAmount * 10;
 	if (aValue > 999999)
 	{
-		return StrFormat("$%d,%03d,%03d", aValue / 1000000, (aValue - aValue / 1000000 * 1000000) / 1000, aValue - aValue / 1000 * 1000);
+		return std::format("${},{:03d},{:03d}", aValue / 1000000, (aValue - aValue / 1000000 * 1000000) / 1000, aValue - aValue / 1000 * 1000);
 	}
 	else if (aValue > 9999)
 	{
-		return StrFormat("$%d,%03d", aValue / 1000, aValue - aValue / 1000 * 1000);
+		return std::format("${},{:03d}", aValue / 1000, aValue - aValue / 1000 * 1000);
 	}
 	else
 	{
-		return StrFormat("$%d", aValue);
+		return std::format("${}", aValue);
 	}
 }
 
@@ -3248,7 +3178,7 @@ std::string LawnGetCurrentLevelName()
 	}
 	if (gLawnApp->IsAdventureMode())
 	{
-		return StrFormat("F%d", gLawnApp->GetStageString(gLawnApp->mBoard->mLevel).c_str());
+		return std::format("F{}", gLawnApp->GetStageString(gLawnApp->mBoard->mLevel));
 	}
 
 	return gLawnApp->GetCurrentChallengeDef().mChallengeName;

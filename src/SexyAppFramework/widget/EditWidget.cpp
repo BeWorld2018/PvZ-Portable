@@ -24,6 +24,7 @@
 
 #include "EditWidget.h"
 #include <algorithm>
+#include <memory>
 #include "graphics/Font.h"
 #include "WidgetManager.h"
 #include "SexyAppBase.h"
@@ -31,18 +32,18 @@
 
 using namespace Sexy;
 
-static int gEditWidgetColors[][3] =
-{{255, 255, 255},
-{0, 0, 0},
-{0, 0, 0},
-{0, 0, 0},
-{255, 255, 255}};
+static constexpr EditWidgetColorScheme gEditWidgetColors{
+	.mBkg = Color(255, 255, 255),
+	.mOutline = Color(0, 0, 0),
+	.mText = Color(0, 0, 0),
+	.mHilite = Color(0, 0, 0),
+	.mHiliteText = Color(255, 255, 255),
+};
 
 EditWidget::EditWidget(int theId, EditListener* theEditListener)
 {
 	mId = theId;
 	mEditListener = theEditListener;
-	mFont = nullptr;
 
 	mHadDoubleClick = false;
 	mHadFocusBeforePress = false;
@@ -59,21 +60,23 @@ EditWidget::EditWidget(int theId, EditListener* theEditListener)
 	mMaxPixels = -1;
 	mBlinkDelay = 40;
 
-	SetColors(gEditWidgetColors, NUM_COLORS);
+	SetColors(gEditWidgetColors);
 }
 
 EditWidget::~EditWidget()
 {
-	delete mFont;
 	ClearWidthCheckFonts();
 
 }
 
+void EditWidget::SetColors(const EditWidgetColorScheme& theColors)
+{
+	mColors = theColors;
+	MarkDirty();
+}
+
 void EditWidget::ClearWidthCheckFonts()
 {
-	for (WidthCheckList::iterator anItr = mWidthCheckList.begin(); anItr != mWidthCheckList.end(); ++anItr)
-		delete anItr->mFont;
-
 	mWidthCheckList.clear();
 }
 
@@ -82,7 +85,7 @@ void EditWidget::AddWidthCheckFont(_Font *theFont, int theMaxPixels)
 	mWidthCheckList.push_back(WidthCheck());
 	WidthCheck &aCheck = mWidthCheckList.back();
 	aCheck.mWidth = theMaxPixels;
-	aCheck.mFont = theFont->Duplicate();
+	aCheck.mFont.reset(theFont->Duplicate());
 }
 
 void EditWidget::SetText(const std::string& theText, bool leftPosToZero)
@@ -113,8 +116,7 @@ void EditWidget::Resize(int theX, int theY, int theWidth, int theHeight)
 
 void EditWidget::SetFont(_Font* theFont, _Font* theWidthCheckFont)
 {
-	delete mFont;
-	mFont = theFont->Duplicate();
+	mFont.reset(theFont->Duplicate());
 
 	ClearWidthCheckFonts();
 	if (theWidthCheckFont != nullptr)
@@ -123,20 +125,21 @@ void EditWidget::SetFont(_Font* theFont, _Font* theWidthCheckFont)
 
 void EditWidget::Draw(Graphics* g) // Already translated
 {
-	if ((mFont == nullptr) && (mWidgetManager->mApp->mDefaultFont != nullptr))
-		mFont = mWidgetManager->mApp->mDefaultFont->Duplicate();
+	_Font* aDefaultFont = mWidgetManager->mApp->mDefaultFont.load();
+	if ((mFont == nullptr) && (aDefaultFont != nullptr))
+		mFont.reset(aDefaultFont->Duplicate());
 	if (mFont == nullptr)
 		return;
 
 	std::string_view aString = mString;
 
-	g->SetColor(mColors[COLOR_BKG]);
+	g->SetColor(mColors.mBkg);
 	g->FillRect(0, 0, mWidth, mHeight);
 
 	for (int i = 0; i < 2; i++)
 	{
-		Graphics* aClipG = g->Create();
-		aClipG->SetFont(mFont);
+		std::unique_ptr<Graphics> aClipG(g->Create());
+		aClipG->SetFont(mFont.get());
 
 		if (i == 1)
 		{
@@ -159,20 +162,19 @@ void EditWidget::Draw(Graphics* g) // Already translated
 		bool hasfocus = mHasFocus || mDrawSelOverride;
 		if (i == 1 && hasfocus)
 		{
-			aClipG->SetColor(mColors[COLOR_HILITE]);
+			aClipG->SetColor(mColors.mHilite);
 			aClipG->FillRect(0, 0, mWidth, mHeight);
 		}
 
 		if (i == 0 || !hasfocus)
-			aClipG->SetColor(mColors[COLOR_TEXT]);
+			aClipG->SetColor(mColors.mText);
 		else
-			aClipG->SetColor(mColors[COLOR_HILITE_TEXT]);
+			aClipG->SetColor(mColors.mHiliteText);
 		aClipG->DrawString(aString.substr(mLeftPos), 4, (mHeight - mFont->GetHeight())/2 + mFont->GetAscent());
 
-		delete aClipG;
 	}
 
-	g->SetColor(mColors[COLOR_OUTLINE]);
+	g->SetColor(mColors.mOutline);
 	g->DrawRect(0, 0, mWidth-1, mHeight-1);
 }
 
@@ -632,9 +634,8 @@ void EditWidget::KeyChar(char theChar)
 	Widget::KeyChar(theChar);
 }
 
-int EditWidget::GetCharAt(int x, int y)
+int EditWidget::GetCharAt(int x, [[maybe_unused]] int y)
 {
-	(void)y;
 	int aPos = 0;
 
 	std::string_view aString = mString;
@@ -788,7 +789,7 @@ void EditWidget::MouseLeave()
 
 void EditWidget::MarkDirty()
 {
-	if (mColors[COLOR_BKG].mAlpha != 255)
+	if (mColors.mBkg.mAlpha != 255)
 		Widget::MarkDirtyFull();
 	else
 		Widget::MarkDirty();
