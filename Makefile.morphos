@@ -28,7 +28,7 @@ LOW_MEMORY = 0
 
 # Build the vendored SDL-Mixer-X subset by default.
 BUILD_MIXERX = 0
-MIXERX_EXTERNAL_LIB ?= -noixemul -L/gg/usr/local/lib -lSDL2_mixerX -lopenmpt 
+MIXERX_EXTERNAL_LIB ?= -noixemul -L/gg/usr/local/lib -lSDL2_mixerX -lopenmpt
 
 # Libraries. Override any group if your MorphOS SDK uses other names.
 SDL_MAIN_LIB ?=
@@ -161,6 +161,11 @@ endif
 LDLIBS := $(MIXERX_LINK_INPUT) $(AUDIO_LIBS) $(IMAGE_LIBS) \
 	$(SDL_LIBS) $(THREAD_LIBS) $(STDCXXFS_LIB) $(SYSTEM_LIBS) $(EXTRA_LIBS)
 
+# Strip the linked executable as the last build step. On by default for
+# release builds; override with STRIP_BINARY=0 to keep the symbols, or
+# STRIP_BINARY=1 to also strip a debug build.
+STRIP_BINARY ?= $(if $(filter release,$(BUILD)),1,0)
+
 .PHONY: all release debug clean distclean strip info sources help
 
 all: $(PROGRAM)
@@ -174,6 +179,10 @@ debug:
 $(PROGRAM): $(APP_OBJECTS) $(MIXERX_PREREQUISITE)
 	@echo "Linking $@"
 	$(CXX) $(LDFLAGS) -o $@ $(APP_OBJECTS) $(LDLIBS)
+ifeq ($(STRIP_BINARY),1)
+	@echo "Stripping $@"
+	$(STRIP) $@
+endif
 
 $(MIXERX_ARCHIVE): $(MIXERX_OBJECTS)
 	@$(MKDIR_P) $(dir $@)
@@ -212,6 +221,7 @@ info:
 	@echo "CXX:                 $(CXX)"
 	@echo "C++ standard:        C++20"
 	@echo "Build SDL-Mixer-X:   $(BUILD_MIXERX)"
+	@echo "Strip binary:        $(STRIP_BINARY)"
 	@echo "Application sources: $(words $(APP_CPP_SOURCES) $(APP_C_SOURCES))"
 	@echo "Mixer-X sources:     $(words $(MIXERX_C_SOURCES))"
 	@echo "Include dirs:        $(SYS_INCLUDE_DIRS)"
@@ -229,7 +239,7 @@ sources:
 help:
 	@echo "PvZ-Portable MorphOS Makefile"
 	@echo ""
-	@echo "  make -f Makefile.morphos [all]       Build a release binary"
+	@echo "  make -f Makefile.morphos [all]       Build a release binary (stripped)"
 	@echo "  make -f Makefile.morphos debug       Build with symbols and PVZ_DEBUG"
 	@echo "  make -f Makefile.morphos strip       Strip the executable"
 	@echo "  make -f Makefile.morphos clean       Remove the active build directory"
@@ -241,5 +251,6 @@ help:
 	@echo "  SYS_LIBRARY_DIRS=\".../lib\""
 	@echo "  MORPHOS_FLAGS=\"<runtime/toolchain flags>\""
 	@echo "  THREAD_LIBS=\"-lpthread\" or THREAD_LIBS=\"\""
+	@echo "  STRIP_BINARY=0         Keep symbols in the release binary"
 
 -include $(DEPS)

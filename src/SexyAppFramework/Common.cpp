@@ -85,13 +85,22 @@ static std::mutex gLogFileSinkMutex;
 
 void Sexy::RegisterLogFileSink(std::string_view thePath)
 {
+#ifdef __MORPHOS__
+	(void)thePath; // logging disabled on MorphOS: no console output, no log file
+#else
 	gLogFileSink.open(PathFromU8(thePath), std::ios::app | std::ios::binary);
 	if (!gLogFileSink)
 		LogErrorLn("Failed to open log file '{}'", thePath);
+#endif
 }
 
 void Sexy::DispatchLogLn(SexyLogPriority thePriority, std::string_view theText)
 {
+#ifdef __MORPHOS__
+	(void)thePriority; // logging disabled on MorphOS
+	(void)theText;
+	return;
+#else
 	if (theText.empty())
 		return;
 
@@ -107,6 +116,7 @@ void Sexy::DispatchLogLn(SexyLogPriority thePriority, std::string_view theText)
 			gLogFileSink.close();
 		}
 	}
+#endif // __MORPHOS__
 }
 
 int Sexy::Rand()

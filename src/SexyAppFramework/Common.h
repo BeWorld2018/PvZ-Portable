@@ -135,13 +135,17 @@ void				RegisterLogFileSink(std::string_view thePath);
 template<typename... Args>
 void				LogInfoLn(std::format_string<Args...> theFmt, Args&&... theArgs)
 {
+#ifndef __MORPHOS__
 	DispatchLogLn(SexyLogPriority::Info, std::vformat(theFmt.get(), std::make_format_args(theArgs...)));
+#endif // logging disabled on MorphOS
 }
 
 template<typename... Args>
 void				LogErrorLn(std::format_string<Args...> theFmt, Args&&... theArgs)
 {
+#ifndef __MORPHOS__
 	DispatchLogLn(SexyLogPriority::Error, std::vformat(theFmt.get(), std::make_format_args(theArgs...)));
+#endif // logging disabled on MorphOS
 }
 
 int					Rand();
