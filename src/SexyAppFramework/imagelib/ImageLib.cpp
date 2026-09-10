@@ -127,6 +127,7 @@ Image* GetPNGImage(const std::string& theFileName)
 
 	// must be volatile: assigned after setjmp, read in the error path after longjmp
 	png_bytep* volatile row_pointers = nullptr;
+	png_bytep volatile rawPixels = nullptr;
 	uint32_t* volatile aBits = nullptr;
 
 	if (setjmp(png_jmpbuf(png_ptr)))
@@ -135,6 +136,7 @@ Image* GetPNGImage(const std::string& theFileName)
 		png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)nullptr);
 		p_fclose(fp);
 		delete[] (png_bytep*)row_pointers;
+		delete[] (png_bytep)rawPixels;
 		delete[] (uint32_t*)aBits;
 		/* If we get here, we had a problem reading the file */
 		return nullptr;
@@ -155,22 +157,19 @@ Image* GetPNGImage(const std::string& theFileName)
 	png_read_update_info(png_ptr, info_ptr);
 
 	const png_size_t rowBytes = png_get_rowbytes(png_ptr, info_ptr);
-	png_bytep rawPixels = new png_byte[rowBytes * height];
+	rawPixels = new png_byte[rowBytes * height];
 
-	png_bytep* row_pointers = new png_bytep[height];
-	aBits = new uint32_t[width * height];
-	for (uint i = 0; i < height; i++)
-	{
-		row_pointers[i] = (png_bytep)(aBits + i * width);
-	}
+	row_pointers = new png_bytep[height];
+	for (png_uint_32 i = 0; i < height; i++)
+		row_pointers[i] = (png_bytep)rawPixels + i * rowBytes;
 
 	png_read_image(png_ptr, row_pointers);
 
-	uint32_t* aBits = new uint32_t[width * height];
+	aBits = new uint32_t[width * height];
 	for (png_uint_32 y = 0; y < height; y++)
 	{
-		const png_bytep src = rawPixels + y * rowBytes;
-		uint32_t* dst = aBits + y * width;
+		const png_bytep src = (png_bytep)rawPixels + y * rowBytes;
+		uint32_t* dst = (uint32_t*)aBits + y * width;
 		for (png_uint_32 x = 0; x < width; x++)
 		{
 			const png_bytep pixel = src + x * 4;

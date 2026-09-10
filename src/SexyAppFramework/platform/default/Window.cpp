@@ -59,11 +59,10 @@ void SexyAppBase::MakeWindow()
 		Uint32 winFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
 			| (!mIsWindowed ? SDL_WINDOW_FULLSCREEN : 0);
 
-#ifndef __MORPHOS__
 		using WindowPtr = std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)>;
 		using GLContextPtr = std::unique_ptr<std::remove_pointer_t<SDL_GLContext>, decltype(&SDL_GL_DeleteContext)>;
-#endif
 
+#ifndef __MORPHOS__
 		// Try OpenGL ES 2.0 first (Linux, most Windows drivers, ANGLE, etc.)
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
@@ -127,7 +126,7 @@ void SexyAppBase::MakeWindow()
 		// clean window background
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		SDL_GL_SwapWindow((SDL_Window*)mWindow);
+		SDL_GL_SwapWindow(window.get());
 #endif
 		SDL_GL_SetSwapInterval(1);
 
